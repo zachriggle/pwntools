@@ -218,18 +218,27 @@ def parse_ldd_output(output):
       output(str): The output to parse
 
     Example:
-        >>> sorted(parse_ldd_output('''
+        >>> actual = sorted(parse_ldd_output('''
         ...     linux-vdso.so.1 =>  (0x00007fffbf5fe000)
         ...     libtinfo.so.5 => /lib/x86_64-linux-gnu/libtinfo.so.5 (0x00007fe28117f000)
         ...     libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fe280f7b000)
         ...     libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe280bb4000)
         ...     /lib64/ld-linux-x86-64.so.2 (0x00007fe2813dd000)
         ... ''').keys())
-        ['/lib/x86_64-linux-gnu/libc.so.6', '/lib/x86_64-linux-gnu/libdl.so.2', '/lib/x86_64-linux-gnu/libtinfo.so.5', '/lib64/ld-linux-x86-64.so.2']
+        >>> expected = [
+        ...     '/lib/x86_64-linux-gnu/libc.so.6',
+        ...     '/lib/x86_64-linux-gnu/libdl.so.2',
+        ...     '/lib/x86_64-linux-gnu/libtinfo.so.5',
+        ...     '/lib64/ld-linux-x86-64.so.2']
+        >>> actual == expected
+        True
     """
     expr_linux   = re.compile(r'\s(?P<lib>\S?/\S+)\s+\((?P<addr>0x.+)\)')
     expr_openbsd = re.compile(r'^\s+(?P<addr>[0-9a-f]+)\s+[0-9a-f]+\s+\S+\s+[01]\s+[0-9]+\s+[0-9]+\s+(?P<lib>\S+)$')
     libs = {}
+
+    if isinstance(output, six.binary_type):
+        output = output.decode()
 
     for s in output.split('\n'):
         match = expr_linux.search(s) or expr_openbsd.search(s)

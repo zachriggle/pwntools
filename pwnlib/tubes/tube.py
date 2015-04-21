@@ -1,6 +1,7 @@
-from __future__ import absolute_import
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import
 import logging
+import os
 import re
 import string
 import subprocess
@@ -784,7 +785,7 @@ class tube(Timeout, Logger):
         self.send(data + self.newline)
         return self.recvuntil(delim, timeout)
 
-    def interactive(self, prompt = term.text.bold_red('$') + ' '):
+    def interactive(self, prompt = term.text.bold_red('$') + b' '):
         """interactive(prompt = pwnlib.term.text.bold_red('$') + ' ')
 
         Does simultaneous reading and writing to the tube. In principle this just
@@ -799,12 +800,14 @@ class tube(Timeout, Logger):
 
         go = threading.Event()
         def recv_thread():
+            stderr = os.fdopen(sys.stderr.fileno(), 'wb')
             while not go.isSet():
                 try:
                     cur = self.recv(timeout = 0.05)
+
                     if cur:
-                        sys.stderr.write(cur)
-                        sys.stderr.flush()
+                        stderr.write(cur)
+                        stderr.flush()
                 except EOFError:
                     self.info('Got EOF while reading in interactive')
                     break

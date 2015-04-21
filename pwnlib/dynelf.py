@@ -260,7 +260,7 @@ class DynELF(object):
         w = None
 
         while True:
-            if self.leak.b(ptr) == 0x7f and self.leak.n(ptr+1,3) == 'ELF':
+            if self.leak.b(ptr) == 0x7f and self.leak.n(ptr+1,3) == b'ELF':
                 break
             ptr -= page_size
 
@@ -742,4 +742,4 @@ class DynELF(object):
         for offset in libcdb.get_build_id_offsets():
             address = libbase + offset
             if self.leak.d(address + 0xC) == unpack("GNU\x00", 32):
-                return enhex(''.join(self.leak.raw(address + 0x10, 20)))
+                return enhex(b''.join(self.leak.raw(address + 0x10, 20)))

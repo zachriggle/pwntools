@@ -207,9 +207,14 @@ def unpack(data, word_size = None, endianness = None, sign = None, **kwargs):
 
         number = 0
 
+        if isinstance(data, six.string_types):
+            data = six.b(data)
+
+        if isinstance(data, six.string_types):
+            data = bytearray(data)
+
         if endianness == "little":
             data = reversed(data)
-        data = bytearray(data)
 
         for c in data:
             number = (number << 8) + c

@@ -1,4 +1,6 @@
 from __future__ import absolute_import
+import six
+
 from .log import getLogger
 from .util.packing import pack
 from .util.packing import unpack
@@ -93,6 +95,11 @@ class MemLeak(object):
             data = None
             try:
                 data = self.leak(address)
+
+                if isinstance(data, six.string_types):
+                    data = six.b(data)
+
+                data = bytearray(data)
             except Exception as e:
                 if self.reraise:
                     raise
@@ -121,7 +128,7 @@ class MemLeak(object):
             return None
 
         # Cache is filled, satisfy the request
-        return ''.join(self.cache[addr+i] for i in range(n))
+        return b''.join(six.int2byte(self.cache[addr+i]) for i in range(n))
 
     def raw(self, addr, numb):
         """raw(addr, numb) -> list
@@ -244,7 +251,13 @@ class MemLeak(object):
         orig = addr
         while self.b(addr):
             addr += 1
-        return self._leak(orig, addr-orig)
+
+        data = self._leak(orig, addr-orig)
+
+        if not isinstance(data, six.string_types):
+            data = data.decode()
+
+        return data
 
     def n(self, addr, numb):
         """n(addr, ndx = 0) -> str
@@ -278,7 +291,7 @@ class MemLeak(object):
         if not all(data):
             return None
 
-        return unpack(''.join(data), size*8)
+        return unpack(b''.join(data), size*8)
 
     def clearb(self, addr, ndx = 0):
         """clearb(addr, ndx = 0) -> int

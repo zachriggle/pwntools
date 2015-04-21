@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 import base64
+import codecs
 import random
 import re
 import string
@@ -30,7 +31,13 @@ def unhex(s):
     s = s.strip()
     if len(s) % 2 != 0:
         s = '0' + s
-    return s.decode('hex')
+
+    s = codecs.decode(s, 'hex')
+
+    if not isinstance(s, six.string_types):
+        s = s.decode()
+
+    return s
 
 def enhex(x):
     """enhex(x) -> str
@@ -42,7 +49,12 @@ def enhex(x):
         >>> enhex("test")
         '74657374'
     """
-    return x.encode('hex')
+    x = codecs.encode(x, 'hex')
+
+    if not isinstance(x, six.string_types):
+        x = x.decode()
+
+    return x
 
 def urlencode(s):
     """urlencode(s) -> str

@@ -33,7 +33,7 @@ def search_by_build_id(hex_encoded_id):
     """
     cache = cache_dir + hex_encoded_id
 
-    if os.path.exists(cache) and read(cache).startswith('\x7FELF'):
+    if os.path.exists(cache) and read(cache).startswith(b'\x7FELF'):
         log.info_once("Using cached data from %r" % cache)
         return cache
 
@@ -43,7 +43,7 @@ def search_by_build_id(hex_encoded_id):
     url      = urlparse.urljoin(url_base, hex_encoded_id)
 
     data   = ""
-    while not data.startswith('\x7fELF'):
+    while not data.startswith(b'\x7fELF'):
         data = wget(url)
 
         if not data:
