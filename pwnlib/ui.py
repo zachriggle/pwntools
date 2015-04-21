@@ -1,3 +1,4 @@
+import six
 import time
 import types
 
@@ -19,12 +20,12 @@ def options(prompt, opts, default = None):
       The users choice in the form of an integer.
 """
 
-    if not isinstance(default, (int, long, types.NoneType)):
+    if not isinstance(default, (types.NoneType)) and not isinstance(default, six.integer_types):
         raise ValueError('options(): default must be a number or None')
 
     if term.term_mode:
         numfmt = '%' + str(len(str(len(opts)))) + 'd) '
-        print ' [?] ' + prompt
+        print(' [?] ' + prompt)
         hs = []
         space = '       '
         arrow = term.text.bold_green('    => ')
@@ -79,9 +80,9 @@ def options(prompt, opts, default = None):
     else:
         linefmt =       '       %' + str(len(str(len(opts)))) + 'd) %s'
         while True:
-            print ' [?] ' + prompt
+            print(' [?] ' + prompt)
             for i, opt in enumerate(opts):
-                print linefmt % (i + 1, opt)
+                print(linefmt % (i + 1, opt))
             s = '     Choice '
             if default:
                 s += '[%s] ' % str(default)
@@ -102,7 +103,7 @@ def pause(n = None):
         else:
             log.info('Paused (press enter to continue)')
             raw_input('')
-    elif isinstance(n, (int, long)):
+    elif isinstance(n, six.integer_types):
         with log.waitfor("Waiting") as l:
             for i in range(n, 0, -1):
                 l.status('%d... ' % i)
@@ -130,9 +131,9 @@ def more(text):
         step = term.height - 1
         for i in range(0, len(lines), step):
             for l in lines[i:i + step]:
-                print l
+                print(l)
             if i + step < len(lines):
                 term.key.get()
         h.delete()
     else:
-        print text
+        print(text)

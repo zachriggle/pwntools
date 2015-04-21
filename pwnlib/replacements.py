@@ -1,5 +1,6 @@
 """Improved replacements for standard functions
 """
+from __future__ import absolute_import
 
 import time as __time
 

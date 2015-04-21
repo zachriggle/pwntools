@@ -47,6 +47,7 @@ Example
 
 DynELF
 """
+from __future__ import absolute_import
 import ctypes
 
 from elftools.elf.enums import ENUM_D_TAG
@@ -61,6 +62,8 @@ from .memleak import MemLeak
 from .util.fiddling import enhex
 from .util.packing import unpack
 from .util.web     import wget
+from six.moves import map
+from six.moves import range
 
 
 log    = getLogger(__name__)
@@ -326,7 +329,7 @@ class DynELF(object):
         leak    = self.leak
         base    = self.libbase
         dynamic = self.dynamic
-        name    = lambda tag: next(k for k,v in ENUM_D_TAG.items() if v == tag)
+        name    = lambda tag: next(k for k,v in list(ENUM_D_TAG.items()) if v == tag)
 
         Dyn = {32: elf.Elf32_Dyn,    64: elf.Elf64_Dyn}     [self.elfclass]
 
@@ -343,7 +346,7 @@ class DynELF(object):
             #Skip to next
             dynamic += sizeof(Dyn)
         else:
-            self.failure("Could not find any of: " % map(name, tags))
+            self.failure("Could not find any of: " % list(map(name, tags)))
             return None
 
         self.status("Found %s at %#x" % (name(d_tag), dynamic))
@@ -556,7 +559,7 @@ class DynELF(object):
         """Performs the actual symbol lookup within one ELF file."""
         leak = self.leak
         Dyn  = {32: elf.Elf32_Dyn, 64: elf.Elf64_Dyn}[self.elfclass]
-        name = lambda tag: next(k for k,v in ENUM_D_TAG.items() if v == tag)
+        name = lambda tag: next(k for k,v in list(ENUM_D_TAG.items()) if v == tag)
 
         self.status('.gnu.hash/.hash, .strtab and .symtab offsets')
 

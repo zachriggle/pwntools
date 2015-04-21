@@ -1,5 +1,6 @@
 <%
-  from pwnlib.shellcraft import arm 
+  from six import string_types
+  from pwnlib.shellcraft import arm
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
 %>
 
@@ -35,7 +36,7 @@ Example:
         swi #0
 </%docstring>
 <%
-  if isinstance(syscall, (str, unicode)) and syscall.startswith('SYS_'):
+  if isinstance(syscall, string_types) and syscall.startswith('SYS_'):
       syscall_repr = syscall[4:] + "(%s)"
       args = []
   else:

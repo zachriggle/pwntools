@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 # -*- coding: utf-8 -*-
 import logging
 import re
@@ -16,6 +17,9 @@ from ..util import fiddling
 from ..util import misc
 from ..util import packing
 from .buffer import Buffer
+from six.moves import map
+import six
+from six.moves import range
 
 
 class tube(Timeout, Logger):
@@ -28,7 +32,7 @@ class tube(Timeout, Logger):
 
     #: Delimiter to use for :meth:`sendline`, :meth:`recvline`,
     #: and related functions.
-    newline = '\n'
+    newline = b'\n'
 
     def __init__(self, timeout = default, level = None):
         super(tube, self).__init__(timeout)
@@ -119,7 +123,7 @@ class tube(Timeout, Logger):
             >>> len(t.buffer)
             3
         """
-        data = ''
+        data = b''
 
         with self.local(timeout):
             data = self.recv_raw(4096)
@@ -127,7 +131,9 @@ class tube(Timeout, Logger):
         if data and self.isEnabledFor(logging.DEBUG):
             self.debug('Received %#x bytes:' % len(data))
 
-            if all(c in string.printable for c in data):
+            printable = six.b(string.printable)
+
+            if all(c in printable for c in data):
                 for line in data.splitlines(True):
                     self.indented(repr(line), level = logging.DEBUG)
             else:
@@ -145,7 +151,7 @@ class tube(Timeout, Logger):
         Recieves one chunk of from the internal buffer or from the OS if the
         buffer is empty.
         """
-        data = ''
+        data = b''
 
         # No buffered data, could not put anything in the buffer
         # before timeout.
@@ -175,7 +181,7 @@ class tube(Timeout, Logger):
             or ``''`` if a timeout occurred while waiting.
         """
 
-        data = ''
+        data = b''
 
         with self.countdown(timeout):
             while not pred(data):
@@ -289,26 +295,33 @@ class tube(Timeout, Logger):
 
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
-            delims = (delims,)
+        if isinstance(delims, six.string_types) or isinstance(delims, six.binary_type):
+            delims = [delims,]
+
+        delims = list(delims)
+
+        for i,delim in enumerate(delims):
+            if isinstance(delim, six.string_types):
+                delims[i] = six.b(delim)
+
 
         # Longest delimiter for tracking purposes
-        longest = max(map(len, delims))
+        longest = max(list(map(len, delims)))
 
         # Cumulative data to search
         data = []
-        top = ''
+        top = b''
 
         with self.countdown(timeout):
             while self.countdown_active():
                 try:
                     res = self.recv(timeout=self.timeout)
                 except Exception:
-                    self.unrecv(''.join(data) + top)
+                    self.unrecv(b''.join(data) + top)
                     raise
 
                 if not res:
-                    self.unrecv(''.join(data) + top)
+                    self.unrecv(b''.join(data) + top)
                     return ''
 
                 top += res
@@ -324,7 +337,7 @@ class tube(Timeout, Logger):
                         top = top[:start]
                     else:
                         top = top[:end]
-                    return ''.join(data) + top
+                    return b''.join(data) + top
                 if len(top) > longest:
                     i = -longest - 1
                     data.append(top[:i])
@@ -371,14 +384,14 @@ class tube(Timeout, Logger):
         """
         lines = []
         with self.countdown(timeout):
-            for _ in xrange(numlines):
+            for _ in range(numlines):
                 try:
                     # We must set 'keepends' to True here so that we can
                     # restore the original, unmodified data to the buffer
                     # in the event of a timeout.
                     res = self.recvline(keepends=True, timeout=timeout)
                 except Exception:
-                    self.unrecv(''.join(lines))
+                    self.unrecv(b''.join(lines))
                     raise
 
                 if res:
@@ -455,7 +468,7 @@ class tube(Timeout, Logger):
         """
 
         tmpbuf = Buffer()
-        line   = ''
+        line   = b''
         with self.countdown(timeout):
             while self.countdown_active():
                 try:
@@ -503,8 +516,8 @@ class tube(Timeout, Logger):
             >>> t.recvline_contains(('car', 'train'))
             'bicycle car train'
         """
-        if isinstance(items, (str,unicode)):
-            items = (items,)
+        if isinstance(items, six.string_types):
+            items = (six.b(items),)
 
         def pred(line):
             return any(d in line for d in items)
@@ -542,7 +555,7 @@ class tube(Timeout, Logger):
                 'World'
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
+        if isinstance(delims, six.string_types):
             delims = (delims,)
 
         return self.recvline_pred(lambda line: any(map(line.startswith, delims)),
@@ -574,7 +587,7 @@ class tube(Timeout, Logger):
                 'Kaboodle'
         """
         # Convert string into singleton tupple
-        if isinstance(delims, (str, unicode)):
+        if isinstance(delims, six.string_types):
             delims = (delims,)
 
         delims = tuple(delim + self.newline for delim in delims)
@@ -596,7 +609,7 @@ class tube(Timeout, Logger):
         all data is buffered and an empty string (``''``) is returned.
         """
 
-        if isinstance(regex, (str, unicode)):
+        if isinstance(regex, six.string_types):
             regex = re.compile(regex)
 
         if exact:
@@ -619,7 +632,7 @@ class tube(Timeout, Logger):
         all data is buffered and an empty string (``''``) is returned.
         """
 
-        if isinstance(regex, (str, unicode)):
+        if isinstance(regex, six.string_types):
             regex = re.compile(regex)
 
         if exact:
@@ -702,17 +715,20 @@ class tube(Timeout, Logger):
             >>> t.send('hello')
             'hello'
         """
+        if isinstance(data, six.string_types):
+            data = six.b(data)
 
         if self.isEnabledFor(logging.DEBUG):
             self.debug('Sent %#x bytes:' % len(data))
-            if all(c in string.printable for c in data):
+            printable = six.b(string.printable)
+            if all(c in printable for c in data):
                 for line in data.splitlines(True):
                     self.indented(repr(line), level = logging.DEBUG)
             else:
                 self.indented(fiddling.hexdump(data), level = logging.DEBUG)
         self.send_raw(data)
 
-    def sendline(self, line=''):
+    def sendline(self, line=b''):
         r"""sendline(data)
 
         Shorthand for ``t.send(data + t.newline)``.
@@ -728,6 +744,8 @@ class tube(Timeout, Logger):
             >>> t.sendline('hello')
             'hello\r\n'
         """
+        if isinstance(line, six.string_types):
+            line = six.b(line)
 
         self.send(line + self.newline)
 
@@ -1096,7 +1114,7 @@ class tube(Timeout, Logger):
 
         Examples:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> t = tube()
             >>> t.shutdown_raw = p
             >>> _=map(t.shutdown, ('in', 'read', 'recv', 'out', 'write', 'send'))

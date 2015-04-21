@@ -1,4 +1,5 @@
 <%
+  from six import integer_types, string_types
   from pwnlib.util import lists, packing, fiddling, misc
   from pwnlib import constants
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
@@ -92,7 +93,7 @@ def pretty(n):
 
 all_regs, sizes, bigger, smaller = misc.register_sizes(regs, [32, 16, 8, 8])
 
-if isinstance(src, (str, unicode)):
+if isinstance(src, string_types):
     src = src.strip()
     if src.lower() in all_regs:
         src = src.lower()
@@ -106,7 +107,7 @@ if isinstance(src, (str, unicode)):
 %>
 % if dest not in all_regs:
    <% log.error('%s is not a register' % str(dest)) %>\
-% elif isinstance(src, (int, long)):
+% elif isinstance(src, integer_types):
     <%
      if src >= 2**sizes[dest] or src < -(2**(sizes[dest]-1)):
          log.error('Number 0x%x does not fit into %s' % (src, dest))

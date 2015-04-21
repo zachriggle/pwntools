@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #
 # Override the behavior of the built-in hex() method
 # to strip the trailing 'L'.
@@ -7,12 +8,12 @@
 # https://www.python.org/dev/peps/pep-0237/
 # https://mail.python.org/pipermail/python-dev/2006-June/065918.html
 #
-import __builtin__
+import six.moves.builtins
 
-original_hex = __builtin__.hex
+original_hex = six.moves.builtins.hex
 
 def hex(number):
     original_hex.__doc__
     return original_hex(number).rstrip('L')
 
-__builtin__.hex = hex
+six.moves.builtins.hex = hex

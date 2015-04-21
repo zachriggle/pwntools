@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import errno
 import select
 import socket
@@ -135,5 +136,5 @@ class sock(tube):
                 else:
                     raise
 
-        if False not in self.closed.values():
+        if False not in list(self.closed.values()):
             self.close()

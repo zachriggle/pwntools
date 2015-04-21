@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import ctypes
 import ctypes.util
 import socket
@@ -139,7 +140,7 @@ def interfaces(all = False):
         addr = ifa['addr']['addr']
         out[name].append((family, addr))
     if not all:
-        out = {k: v for k, v in out.items() if v}
+        out = {k: v for k, v in list(out.items()) if v}
     return out
 
 def interfaces4(all = False):
@@ -157,7 +158,7 @@ def interfaces4(all = False):
       IPv4 addresses.
 """
     out = {}
-    for name, addrs in interfaces(all = all).items():
+    for name, addrs in list(interfaces(all = all).items()):
         addrs = [addr for fam, addr in addrs if fam == socket.AF_INET]
         if addrs or all:
             out[name] = addrs
@@ -178,7 +179,7 @@ def interfaces6(all = False):
       IPv6 addresses.
 """
     out = {}
-    for name, addrs in interfaces(all = all).items():
+    for name, addrs in list(interfaces(all = all).items()):
         addrs = [addr for fam, addr in addrs if fam == socket.AF_INET6]
         if addrs or all:
             out[name] = addrs

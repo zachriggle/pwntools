@@ -1,4 +1,5 @@
 <%
+  from six import integer_types, string_types
   from pwnlib.shellcraft import common
   from pwnlib import constants
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
@@ -46,7 +47,7 @@ Example:
 <%
 all_regs = ['r' + str(n) for n in range(16)] + ['sp', 'fp', 'pc', 'lr']
 src_orig = src
-if isinstance(src, (str, unicode)):
+if isinstance(src, string_types):
     src = src.strip()
     if src.lower() in all_regs:
         src = src.lower()
@@ -61,7 +62,7 @@ if isinstance(src, (str, unicode)):
 %>
 % if dst == src:
   /* moving ${src} into ${dst}, but this is a no-op */
-% elif not isinstance(src, (int, long)):
+% elif not isinstance(src, integer_types):
     mov ${dst}, ${src}
 % else:
   <%

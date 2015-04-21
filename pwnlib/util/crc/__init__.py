@@ -11,6 +11,7 @@ the crc32-sum of ``'A'*40000``.
 
 An obvious optimization would be to actually generate some lookup-tables.
 """
+from __future__ import absolute_import
 
 import sys
 import types
@@ -18,11 +19,13 @@ import types
 from . import known
 from .. import fiddling
 from .. import packing
+import six
+from six.moves import range
 
 
 class BitPolynom(object):
     def __init__(self, n):
-        if not isinstance(n, (int, long)):
+        if not isinstance(n, six.integer_types):
             raise TypeError("Polynomial must be called with an integer or a list")
         if n < 0:
             raise ValueError("Polynomials cannot be negative: %d" % n)
@@ -218,7 +221,7 @@ class Module(types.ModuleType):
     def _make_crc(name, polynom, width, init, refin, refout, xorout, check, extra_doc = ''):
         def inner(data):
             return crc.generic_crc(data, polynom, width, init, refin, refout, xorout)
-        inner.func_name = 'crc_' + name
+        inner.__name__ = 'crc_' + name
         inner.__name__  = 'crc_' + name
 
         inner.__doc__   = """%s(data) -> int
@@ -277,7 +280,7 @@ class Module(types.ModuleType):
             [<function crc_crc_16_dnp at ...>]
         """
         candidates = []
-        for v in known.all_crcs.keys():
+        for v in list(known.all_crcs.keys()):
             func = getattr(crc, v)
             if func(data) == checksum:
                 candidates.append(func)

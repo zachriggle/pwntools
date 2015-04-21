@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from six.moves import map
 __all__ = ['Keymap']
 
 from . import key
@@ -37,7 +39,7 @@ class Keymap:
         if self._on_key:
             self._on_key(self.trace)
         match = False
-        for m, (t, cbs) in self._cur.items():
+        for m, (t, cbs) in list(self._cur.items()):
             if m(k):
                 self._cur = t
                 if cbs:
@@ -56,7 +58,7 @@ class Keymap:
 
     def register(self, desc, cb = None):
         if isinstance(desc, dict):
-            for k, v in desc.items():
+            for k, v in list(desc.items()):
                 self.register(k, v)
         else:
             if   desc == '<match>':
@@ -66,7 +68,7 @@ class Keymap:
             elif desc == '<any>':
                 self.on_key(cb)
             else:
-                ms = map(key.Matcher, desc.split(' '))
+                ms = list(map(key.Matcher, desc.split(' ')))
                 if not ms:
                     return
                 t = self._top
@@ -77,7 +79,7 @@ class Keymap:
                 cbs.append(cb)
 
     def unregister(self, desc, cb = None):
-        ms = map(key.Matcher, desc.split(' '))
+        ms = list(map(key.Matcher, desc.split(' ')))
         if not ms:
             return
         t = self._top

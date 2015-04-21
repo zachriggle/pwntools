@@ -1,9 +1,11 @@
+from __future__ import absolute_import
 import socket
 import ssl as _ssl
 
 from ..log import getLogger
 from ..timeout import Timeout
 from .sock import sock
+import six
 
 log = getLogger(__name__)
 
@@ -73,7 +75,7 @@ class remote(sock):
     @staticmethod
     def _get_family(fam):
 
-        if isinstance(fam, (int, long)):
+        if isinstance(fam, six.integer_types):
             pass
         elif fam == 'any':
             fam = socket.AF_UNSPEC
@@ -89,7 +91,7 @@ class remote(sock):
     @staticmethod
     def _get_type(typ):
 
-        if isinstance(typ, (int, long)):
+        if isinstance(typ, six.integer_types):
             pass
         elif typ == "tcp":
             typ = socket.SOCK_STREAM

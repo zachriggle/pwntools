@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import
+from six.moves import range
 __all__ = ['spinners']
 
 def billboard(msg, window):
-    return [msg[i : i + window].ljust(window, ' ') for i in xrange(len(msg))]
+    return [msg[i : i + window].ljust(window, ' ') for i in range(len(msg))]
 
 spinners = [
     ['/.......','./......','../.....','.../....','..../...','...../..','....../.',

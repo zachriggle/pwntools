@@ -1,5 +1,8 @@
+from __future__ import absolute_import
+import six
+
 _const_codes = [
-    'POP_TOP','ROT_TWO','ROT_THREE','ROT_FOUR','DUP_TOP',
+    'POP_TOP','ROT_TWO','ROT_THREE','DUP_TOP',
     'BUILD_LIST','BUILD_MAP','BUILD_TUPLE',
     'LOAD_CONST','RETURN_VALUE','STORE_SUBSCR', 'STORE_MAP'
     ]
@@ -7,11 +10,16 @@ _const_codes = [
 _expr_codes = _const_codes + [
     'UNARY_POSITIVE','UNARY_NEGATIVE','UNARY_NOT',
     'UNARY_INVERT','BINARY_POWER','BINARY_MULTIPLY',
-    'BINARY_DIVIDE','BINARY_FLOOR_DIVIDE','BINARY_TRUE_DIVIDE',
+    'BINARY_FLOOR_DIVIDE','BINARY_TRUE_DIVIDE',
     'BINARY_MODULO','BINARY_ADD','BINARY_SUBTRACT',
     'BINARY_LSHIFT','BINARY_RSHIFT','BINARY_AND','BINARY_XOR',
     'BINARY_OR',
     ]
+
+
+if six.PY2:
+    _const_codes.extend(['ROT_FOUR'])
+    _expr_codes.extend(['BINARY_DIVIDE'])
 
 _values_codes = _expr_codes + ['LOAD_NAME']
 
@@ -29,7 +37,8 @@ def _get_opcodes(codeobj):
     opcodes = []
     s = codeobj.co_code
     while i < len(s):
-        code = ord(s[i])
+        if six.PY2: code = ord(s[i])
+        if six.PY3: code = s[i]
         opcodes.append(code)
         if code >= dis.HAVE_ARGUMENT:
             i += 3

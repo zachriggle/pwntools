@@ -1,3 +1,4 @@
+import six
 import os
 import random
 import re
@@ -31,7 +32,7 @@ def debug_shellcode(data, execute=None, **kwargs):
         with open(tmp_elf,'wb+') as f:
             f.write(elf_data)
             f.flush()
-        os.chmod(tmp_elf, 0777)
+        os.chmod(tmp_elf, 0o777)
         return debug(tmp_elf, execute=None, arch=context.arch)
 
 def get_qemu_arch(arch):
@@ -60,7 +61,7 @@ def debug(args, execute=None, exe=None, ssh=None, arch=None):
     Returns:
         A tube connected to the target process
     """
-    if isinstance(args, (str, unicode)):
+    if isinstance(args, string_types):
         args = [args]
 
     orig_args = args
@@ -109,7 +110,9 @@ def debug(args, execute=None, exe=None, ssh=None, arch=None):
     attach(('127.0.0.1', port), exe=orig_args[0], execute=execute, arch=context.arch)
 
     if ssh:
-        remote <> listener.wait_for_connection()
+        a = remote
+        b = listener.wait_for_connection()
+        a << b << a
 
     # gdbserver outputs a message when a client connects
     garbage = gdbserver.recvline(timeout=1)
@@ -133,7 +136,7 @@ def run_elf(*a, **kw):
     with open(f, 'wb+') as F:
         F.write(e)
         F.flush()
-    os.chmod(f, 0777)
+    os.chmod(f, 0o777)
     return tubes.process.process(f)
 
 
@@ -197,7 +200,7 @@ def attach(target, execute = None, exe = None, arch = None):
 
     # let's see if we can find a pid to attach to
     pid = None
-    if   isinstance(target, (int, long)):
+    if   isinstance(target, six.integer_types):
         # target is a pid, easy peasy
         pid = target
     elif isinstance(target, str):
@@ -354,7 +357,9 @@ def ssh_gdb(ssh, process, execute = None, arch = None, **kwargs):
     forwardport = l.lport
 
     attach(('127.0.0.1', forwardport), execute, local_exe, arch)
-    l.wait_for_connection() <> ssh.connect_remote('127.0.0.1', gdbport)
+    a = l.wait_for_connection()
+    b = ssh.connect_remote('127.0.0.1', gdbport)
+    a << b << a
     return c
 
 def find_module_addresses(binary, ssh=None, ulimit=False):
@@ -467,7 +472,7 @@ def find_module_addresses(binary, ssh=None, ulimit=False):
         try:
             path     = next(p for p in local_libs.keys() if remote_path in p)
         except StopIteration:
-            print "Skipping %r" % remote_path
+            print("Skipping %r" % remote_path)
             continue
 
         # Load it

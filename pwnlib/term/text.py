@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import functools
 import sys
 import types
@@ -6,7 +7,7 @@ from . import termcap
 
 
 def eval_when(when):
-    if isinstance(when, file) or \
+    if hasattr(when, 'isatty') or \
       when in ('always', 'never', 'auto', sys.stderr, sys.stdout):
         if   when == 'always':
             return True
@@ -23,7 +24,7 @@ class Module(types.ModuleType):
     def __init__(self):
         self.__file__ = __file__
         self.__name__ = __name__
-        self.num_colors = termcap.get('colors', default = 8)
+        self.num_colors = termcap.get('colors', default = 8) or 8
         self.has_bright = self.num_colors >= 16
         self.has_gray = self.has_bright
         self.when = 'auto'

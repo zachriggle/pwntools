@@ -1,6 +1,8 @@
+from __future__ import absolute_import
 from .log import getLogger
 from .util.packing import pack
 from .util.packing import unpack
+from six.moves import range
 
 log = getLogger(__name__)
 
@@ -80,7 +82,7 @@ class MemLeak(object):
         Returns:
             A string of length ``n``, or ``None``.
         """
-        addresses = [addr+i for i in xrange(n)]
+        addresses = [addr+i for i in range(n)]
 
         for address in addresses:
             # Cache hit
@@ -119,13 +121,13 @@ class MemLeak(object):
             return None
 
         # Cache is filled, satisfy the request
-        return ''.join(self.cache[addr+i] for i in xrange(n))
+        return ''.join(self.cache[addr+i] for i in range(n))
 
     def raw(self, addr, numb):
         """raw(addr, numb) -> list
 
         Leak `numb` bytes at `addr`"""
-        return map(lambda a: self._leak(a, 1), range(addr, addr+numb))
+        return [self._leak(a, 1) for a in range(addr, addr+numb)]
 
 
     def _b(self, addr, ndx, size):
@@ -271,7 +273,7 @@ class MemLeak(object):
 
     def _clear(self, addr, ndx, size):
         addr += ndx * size
-        data = map(lambda x: self.cache.pop(x, None), range(addr, addr+size))
+        data = [self.cache.pop(x, None) for x in range(addr, addr+size)]
 
         if not all(data):
             return None

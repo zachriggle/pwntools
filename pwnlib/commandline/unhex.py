@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #!/usr/bin/env python2
 import argparse
 import sys
@@ -17,7 +18,7 @@ def main():
             sys.stdout.write(s.decode('hex'))
         else:
             sys.stdout.write(''.join(sys.argv[1:]).decode('hex'))
-    except TypeError, e:
+    except TypeError as e:
         sys.stderr.write(str(e) + '\n')
 
 if __name__ == '__main__': main()

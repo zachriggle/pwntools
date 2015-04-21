@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import errno
 import socket
 
@@ -5,6 +6,7 @@ from ..context import context
 from ..log import getLogger
 from ..timeout import Timeout
 from .sock import sock
+import six
 
 log = getLogger(__name__)
 
@@ -36,7 +38,7 @@ class listen(sock):
             fam = socket.AF_INET
         elif fam == 6 or fam.lower() in ['ipv6', 'ip6', 'v6', '6']:
             fam = socket.AF_INET6
-        elif isinstance(fam, (int, long)):
+        elif isinstance(fam, six.integer_types):
             pass
         else:
             self.error("remote(): family %r is not supported" % fam)
@@ -45,7 +47,7 @@ class listen(sock):
             typ = socket.SOCK_STREAM
         elif typ == "udp":
             typ = socket.SOCK_DGRAM
-        elif isinstance(typ, (int, long)):
+        elif isinstance(typ, six.integer_types):
             pass
         else:
             self.error("remote(): type %r is not supported" % typ)

@@ -1,5 +1,6 @@
 """Exposes functionality for manipulating ELF files
 """
+from __future__ import absolute_import
 import mmap
 import os
 import subprocess
@@ -18,10 +19,11 @@ from ..log import getLogger
 from ..term import text
 from ..util import misc
 from .datatypes import *
+from six.moves import filter
 
 log = getLogger(__name__)
 
-__all__ = ['load', 'ELF'] + sorted(filter(lambda x: not x.startswith('_'), datatypes.__dict__.keys()))
+__all__ = ['load', 'ELF'] + sorted([x for x in list(datatypes.__dict__.keys()) if not x.startswith('_')])
 
 def load(*args, **kwargs):
     """Compatibility wrapper for pwntools v1"""
@@ -95,7 +97,7 @@ class ELF(ELFFile):
         if self.elftype == 'DYN':
             self._address = 0
         else:
-            self._address = min(filter(bool, (s.header.p_vaddr for s in self.segments)))
+            self._address = min(list(filter(bool, (s.header.p_vaddr for s in self.segments))))
         self.load_addr = self._address
 
         self._describe()
@@ -181,9 +183,9 @@ class ELF(ELFFile):
         delta     = new-self._address
         update    = lambda x: x+delta
 
-        self.symbols = {k:update(v) for k,v in self.symbols.items()}
-        self.plt     = {k:update(v) for k,v in self.plt.items()}
-        self.got     = {k:update(v) for k,v in self.got.items()}
+        self.symbols = {k:update(v) for k,v in list(self.symbols.items())}
+        self.plt     = {k:update(v) for k,v in list(self.plt.items())}
+        self.got     = {k:update(v) for k,v in list(self.got.items())}
 
         self._address = update(self.address)
 
@@ -263,16 +265,16 @@ class ELF(ELFFile):
                 if not symbol.entry.st_value:
                     continue
 
-                self.symbols[symbol.name] = symbol.entry.st_value
+                self.symbols[symbol.name.decode()] = symbol.entry.st_value
 
         # Add 'plt.foo' and 'got.foo' to the symbols for entries,
         # iff there is no symbol for that address
-        for sym, addr in self.plt.items():
-            if addr not in self.symbols.values():
+        for sym, addr in list(self.plt.items()):
+            if addr not in list(self.symbols.values()):
                 self.symbols['plt.%s' % sym] = addr
 
-        for sym, addr in self.got.items():
-            if addr not in self.symbols.values():
+        for sym, addr in list(self.got.items()):
+            if addr not in list(self.symbols.values()):
                 self.symbols['got.%s' % sym] = addr
 
 
@@ -343,7 +345,7 @@ class ELF(ELFFile):
 
 
         # Based on the ordering of the GOT symbols, populate the PLT
-        for i,(addr,name) in enumerate(sorted((addr,name) for name, addr in self.got.items())):
+        for i,(addr,name) in enumerate(sorted((addr,name) for name, addr in list(self.got.items()))):
             self.plt[name] = plt.header.sh_addr + header_size + i*entry_size
 
     def search(self, needle, writable = False):
@@ -619,7 +621,7 @@ class ELF(ELFFile):
 
     @property
     def packed(self):
-        return 'UPX!' in self.get_data()
+        return b'UPX!' in self.get_data()
 
     @property
     def pie(self):

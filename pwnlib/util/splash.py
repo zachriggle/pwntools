@@ -1,10 +1,13 @@
 """Silly module mostly meant as an easter-egg."""
+from __future__ import absolute_import
 
 import threading
 import time
 
 from .. import term
 from ..term import text
+from six.moves import range
+from six.moves import zip
 
 
 _banner = r'''

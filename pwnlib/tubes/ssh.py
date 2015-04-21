@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import inspect
 import logging
 import os
@@ -21,11 +22,12 @@ from ..util import misc
 from ..util import safeeval
 from .process import process
 from .sock import sock
+import six
 
 # Kill the warning line:
 # No handlers could be found for logger "paramiko.transport"
 paramiko_log = logging.getLogger("paramiko.transport")
-h = logging.StreamHandler(file('/dev/null','w+'))
+h = logging.StreamHandler(open('/dev/null','w+'))
 h.setFormatter(logging.Formatter())
 paramiko_log.addHandler(h)
 
@@ -89,7 +91,7 @@ class ssh_channel(sock):
             process = "cd %s >/dev/null 2>&1; %s" % (misc.sh_string(wd), process)
 
         if process and env:
-            for name, value in env.items():
+            for name, value in list(env.items()):
                 if not re.match('^[a-zA-Z_][a-zA-Z0-9_]*$', name):
                     self.error('run(): Invalid environment key $r' % name)
                 process = '%s=%s %s' % (name, misc.sh_string(value), process)
@@ -434,7 +436,7 @@ class ssh(Timeout, Logger):
 
             if os.path.exists(config_file):
                 ssh_config  = paramiko.SSHConfig()
-                ssh_config.parse(file(config_file))
+                ssh_config.parse(open(config_file))
                 host_config = ssh_config.lookup(host)
                 if 'hostname' in host_config:
                     self.host = host = host_config['hostname']
@@ -604,7 +606,7 @@ class ssh(Timeout, Logger):
 
         argv      = argv or []
 
-        if isinstance(argv, (str, unicode)):
+        if isinstance(argv, (str, six.text_type)):
             argv = [argv]
 
         if not isinstance(argv, (list, tuple)):
@@ -938,13 +940,13 @@ os.execve(exe, argv, env)
 
         # OpenSSL outputs in the format of...
         # (stdin)= e3b0c4429...
-        data = data.replace('(stdin)= ','')
+        data = data.replace(b'(stdin)= ',b'')
 
         # sha256 and sha256sum outputs in the format of...
         # e3b0c442...  -
-        data = data.replace('-','')
+        data = data.replace(b'-',b'')
 
-        return data.strip()
+        return data.strip().decode()
 
     def _get_cachefile(self, fingerprint):
         return os.path.join(self._cachedir, fingerprint)
@@ -1004,6 +1006,7 @@ os.execve(exe, argv, env)
 
         with context.local(log_level='error'):
             remote = self.readlink('-f',remote)
+            remote = remote.decode()
 
         fingerprint = self._get_fingerprint(remote)
         if fingerprint is None:
@@ -1255,7 +1258,7 @@ os.execve(exe, argv, env)
 
         seen = set()
 
-        for lib, addr in libs.items():
+        for lib, addr in list(libs.items()):
             local = os.path.realpath(os.path.join(directory, '.' + os.path.sep + lib))
             if not local.startswith(directory):
                 self.warning('This seems fishy: %r' % lib)
@@ -1316,6 +1319,9 @@ os.execve(exe, argv, env)
         if not wd:
             wd, status = self.run_to_end('x=$(mktemp -d) && cd $x && chmod +x . && echo $PWD', wd='.')
             wd = wd.strip()
+
+            if isinstance(wd, bytes):
+                wd = wd.decode()
 
             if status:
                 self.error("Could not generate a temporary directory (%i)\n%s" % (status, wd))

@@ -1,4 +1,5 @@
 <%
+  from six import integer_types, string_types
   from pwnlib.util import packing
   from pwnlib.shellcraft import amd64
   from pwnlib import constants
@@ -44,7 +45,7 @@ Example:
 
 <%
   value_orig = value
-  if isinstance(value, (str, unicode)):
+  if isinstance(value, string_types):
     try:
       with ctx.local(arch = 'amd64'):
         value = constants.eval(value)
@@ -52,7 +53,7 @@ Example:
       pass
 %>
 
-% if isinstance(value, (int,long)):
+% if isinstance(value, integer_types):
     /* push ${repr(value_orig)} */
     ${re.sub(r'^\s*/.*\n', '', amd64.pushstr(packing.pack(value), False), 1)}
 % else:

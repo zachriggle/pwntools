@@ -144,7 +144,7 @@ KEY_NAMES = {
     KEY_KPEQUALS  : '<kp equals>',
     }
 
-KEY_NAMES_REVERSE = {v:k for k, v in KEY_NAMES.items()}
+KEY_NAMES_REVERSE = {v:k for k, v in list(KEY_NAMES.items())}
 
 # terminfo
 

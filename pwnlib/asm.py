@@ -39,6 +39,7 @@ Disassembly
     '   0:   b8 0b 00 00 00          mov    eax,0xb'
 
 """
+from __future__ import absolute_import
 import errno
 import os
 import platform
@@ -168,6 +169,7 @@ def _assembler():
         checked_assembler_version[gas] = True
         result = subprocess.check_output([gas, '--version','/dev/null'],
                                          stderr=subprocess.STDOUT)
+        result = result.decode()
         version = re.search(r' (\d\.\d+)', result).group(1)
         if version < '2.19':
             log.warn_once('Your binutils version is too old and may not work!\n'  + \
@@ -279,14 +281,15 @@ def _bfdarch():
 
     return arch
 
-def _run(cmd, stdin = None):
+def _run(cmd, stdin = ''):
     log.debug(subprocess.list2cmdline(cmd))
     try:
         proc = subprocess.Popen(
             cmd,
             stdin  = subprocess.PIPE,
             stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE
+            stderr = subprocess.PIPE,
+            universal_newlines=True
         )
         stdout, stderr = proc.communicate(stdin)
         exitcode = proc.wait()
@@ -415,7 +418,7 @@ def make_elf(data, vma = None, strip=True, **kwargs):
                 _run([which_binutils('objcopy'), '-Sg', step3])
                 _run([which_binutils('strip'), '--strip-unneeded', step3])
 
-            with open(step3, 'r') as f:
+            with open(step3, 'rb') as f:
                 return f.read()
         except Exception:
             log.exception("An error occurred while building an ELF:\n%s" % code)
@@ -485,7 +488,7 @@ def asm(shellcode, vma = 0, **kwargs):
                                 '--entry=%#x' % vma,
                                 '-o', step3, step2])
 
-            elif file(step2,'rb').read(4) == '\x7fELF':
+            elif open(step2,'rb').read(4) == '\x7fELF':
                 # Sanity check for seeing if the output has relocations
                 relocs = subprocess.check_output(
                     [which_binutils('readelf'), '-r', step2]
@@ -497,7 +500,7 @@ def asm(shellcode, vma = 0, **kwargs):
 
             _run(objcopy + [step3, step4])
 
-            with open(step4) as fd:
+            with open(step4, 'rb') as fd:
                 result = fd.read()
 
         except Exception:

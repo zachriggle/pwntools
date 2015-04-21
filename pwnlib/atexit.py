@@ -7,8 +7,10 @@ this replacement module also defines :func:`unregister`.
 This module also fixes a the issue that exceptions raised by an exit handler is
 printed twice when the standard :mod:`atexit` is used.
 """
+from __future__ import absolute_import
 
 import sys
+import atexit
 import threading
 import traceback
 
@@ -77,7 +79,7 @@ def _run_handlers():
     """
     context.clear()
     for _ident, (func, args, kwargs, ctx) in \
-        sorted(_handlers.items(), reverse = True):
+        sorted(list(_handlers.items()), reverse = True):
         try:
             with context.local(**ctx):
                 func(*args, **kwargs)
@@ -93,4 +95,4 @@ def _run_handlers():
 if hasattr(sys, "exitfunc"):
     register(sys.exitfunc)
 
-sys.exitfunc = _run_handlers
+atexit.register(_run_handlers)

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 import re
 
@@ -6,6 +7,7 @@ from pwnlib.memleak import MemLeak
 from pwnlib.util.cyclic import *
 from pwnlib.util.fiddling import randoms
 from pwnlib.util.packing import *
+from six.moves import range
 
 log = getLogger(__name__)
 

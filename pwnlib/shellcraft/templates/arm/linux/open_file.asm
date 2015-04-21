@@ -1,3 +1,6 @@
+<%
+  from six import integer_types
+%>
 <%page args="filepath, flags = 'O_RDONLY', mode = 0644"/>
 <%docstring>Opens a file. Leaves the file descriptor in r0.
 
@@ -19,7 +22,7 @@ Args:
           break
   filepath_out = ', '.join(filepath_out)
 
-  if isinstance(mode, (int, long)):
+  if isinstance(mode, integer_types):
       mode = hex(mode)
 %>
 %if expr(cpp("%s & O_CREAT" % flags, arch = 'arm', os = 'linux')):

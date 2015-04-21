@@ -2,6 +2,7 @@
 Analogous to atexit, this module allows the programmer to register functions to
 be run if an unhandled exception occurs.
 """
+from __future__ import absolute_import
 
 import sys
 import threading
@@ -73,7 +74,7 @@ def _run_handlers():
     """
     context.clear()
     for _ident, (func, args, kwargs, ctx) in \
-        sorted(_handlers.items(), reverse = True):
+        sorted(list(_handlers.items()), reverse = True):
         try:
             with context.local(**ctx):
                 func(*args, **kwargs)

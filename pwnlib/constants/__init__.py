@@ -32,6 +32,7 @@ Example:
     4
 
 """
+from __future__ import absolute_import
 import importlib
 import sys
 from types import ModuleType

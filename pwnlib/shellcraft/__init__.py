@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import os
 import re
 import sys
@@ -6,6 +7,7 @@ from types import ModuleType
 from . import internal
 from .. import constants
 from ..context import context
+import six
 
 
 class module(ModuleType):
@@ -51,7 +53,7 @@ class module(ModuleType):
         self.__dict__.update(self._submodules)
 
         # These are exported
-        self.__all__ = sorted(self._shellcodes.keys() + self._submodules.keys())
+        self.__all__ = sorted(list(self._shellcodes.keys()) + list(self._submodules.keys()))
 
         # Make sure this is not called again
         self.__lazyinit__ = None
@@ -92,13 +94,13 @@ class module(ModuleType):
 
     def _context_modules(self):
         self.__lazyinit__ and self.__lazyinit__()
-        for k, m in self._submodules.items():
+        for k, m in list(self._submodules.items()):
             if k in [context.arch, context.os]:
                 yield m
 
     def __shellcodes__(self):
         self.__lazyinit__ and self.__lazyinit__()
-        result = self._shellcodes.keys()
+        result = list(self._shellcodes.keys())
         for m in self._context_modules():
             result.extend(m.__shellcodes__())
         return result
@@ -107,7 +109,7 @@ class module(ModuleType):
     templates    = []
 
     for root, subfolder, files in os.walk(template_dir):
-        for file in filter(lambda x: x.endswith('.asm'), files):
+        for file in [x for x in files if x.endswith('.asm')]:
             value = os.path.splitext(file)[0]
             value = os.path.join(root, value)
             value = value.replace(template_dir, '')
@@ -118,11 +120,11 @@ class module(ModuleType):
     templates = sorted(templates)
 
     def eval(self, item):
-        if isinstance(item, (int,long)):
+        if isinstance(item, six.integer_types):
             return item
         return constants.eval(item)
 
-    import registers
+    from . import registers
 
 # To prevent garbage collection
 tether = sys.modules[__name__]

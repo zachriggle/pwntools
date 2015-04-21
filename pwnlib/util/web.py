@@ -1,9 +1,11 @@
+from __future__ import absolute_import
 # -*- coding: utf-8 -*-
 import os
 import tempfile
 
 from ..log import getLogger
 from .misc import size
+import six
 
 log = getLogger(__name__)
 
@@ -61,10 +63,10 @@ def wget(url, save=None, timeout=5, **kwargs):
 
         # Save to the target file if provided
         if save:
-            if not isinstance(save, (str, unicode)):
+            if not isinstance(save, (str, six.text_type)):
                 save = os.path.basename(url)
                 save = save or tempfile.NamedTemporaryFile(dir='.', delete=False).name
-            with file(save,'wb+') as f:
+            with open(save,'wb+') as f:
                 f.write(total_data)
                 w.success('Saved %r (%s)' % (f.name, size(total_data)))
         else:

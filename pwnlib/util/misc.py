@@ -1,13 +1,16 @@
+from __future__ import absolute_import
 import base64
 import errno
 import os
 import re
+import six
 import socket
 import stat
 import string
 
 from . import lists
 from ..log import getLogger
+from six.moves import zip
 
 log = getLogger(__name__)
 
@@ -86,13 +89,16 @@ def size(n, abbriv = 'B', si = False):
 
 
 def read(path):
-    """read(path) -> str
+    r"""read(path) -> str
 
     Open file, return content.
 
     Examples:
-        >>> read('pwnlib/util/misc.py').split('\\n')[0]
-        'import base64'
+
+        >>> with open('/tmp/read_example','wb+') as w:
+        ...    w.write('\x01\x02\xff\x04')
+        >>> read('/tmp/read_example')
+        '\x01\x02\xff\x04'
     """
     path = os.path.expanduser(os.path.expandvars(path))
     with open(path) as fd:
@@ -100,7 +106,15 @@ def read(path):
 
 
 def write(path, data = '', create_dir = False):
-    """Create new file or truncate existing to zero length and write data."""
+    r"""
+    Create new file or truncate existing to zero length and write data.
+
+    Examples:
+
+        >>> write('/tmp/write_example', '\x01\x02\xff\x04')
+        >>> open('/tmp/write_example', 'rb').read()
+        '\x01\x02\xff\x04'
+    """
     path = os.path.expanduser(os.path.expandvars(path))
     if create_dir:
         path = os.path.realpath(path)
@@ -266,6 +280,9 @@ def sh_string(s):
     good      = (very_good | set(string.punctuation + ' ')) - set("'")
     alt_good  = (very_good | set(string.punctuation + ' ')) - set('!')
 
+    if isinstance(s, bytes):
+        s = s.decode()
+
     if '\x00' in s:
         log.error("sh_string(): Cannot create a null-byte")
 
@@ -290,7 +307,7 @@ def sh_string(s):
                 fixed += c
             else:
                 fixed += '\\x%02x' % ord(c)
-        return '"$( (echo %s|(base64 -d||openssl enc -d -base64)||echo -en \'%s\') 2>/dev/null)"' % (base64.b64encode(s), fixed)
+        return '"$( (echo %s|(base64 -d||openssl enc -d -base64)||echo -en \'%s\') 2>/dev/null)"' % (base64.b64encode(six.b(s)), fixed)
 
 def register_sizes(regs, in_sizes):
     """Create dictionaries over register sizes and relations

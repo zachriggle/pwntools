@@ -1,7 +1,11 @@
+from __future__ import absolute_import
 from . import keyconsts as kc
 from . import keymap as km
 from . import term
 from . import text
+from six.moves import map
+import six
+from six.moves import range
 
 cursor = text.reverse
 
@@ -39,7 +43,7 @@ def set_completer(completer):
 def fmt_suggestions(suggestions):
     if suggestions:
         s = ''
-        l = max(map(len, suggestions))
+        l = max(list(map(len, suggestions)))
         columns = term.width // (l + 1)
         column_width = term.width // columns
         fmt = '%%-%ds' % column_width
@@ -126,8 +130,8 @@ def self_insert(trace):
 
 def set_buffer(left, right):
     global buffer_left, buffer_right
-    buffer_left = unicode(left)
-    buffer_right = unicode(right)
+    buffer_left = six.text_type(left)
+    buffer_right = six.text_type(right)
     redisplay()
 
 def cancel_search(*_):
@@ -402,7 +406,7 @@ def readline(_size = None, prompt = '', float = True, priority = 10):
 
 def init():
     # defer imports until initialization
-    import sys, __builtin__
+    import sys, six.moves.builtins
     from ..util import safeeval
 
     class Wrapper:
@@ -426,7 +430,7 @@ def init():
                          bottom of the screen when `term.term_mode` is enabled.
         """
         return readline(None, prompt, float)
-    __builtin__.raw_input = raw_input
+    six.moves.builtins.raw_input = raw_input
 
     def input(prompt = '', float = True):
         """input(prompt = '', float = True)
@@ -440,4 +444,4 @@ def init():
                          bottom of the screen when `term.term_mode` is enabled.
         """
         return safeeval.const(readline(None, prompt, float))
-    __builtin__.input = input
+    six.moves.builtins.input = input

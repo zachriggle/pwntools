@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import errno
 import fcntl
 import logging
@@ -12,6 +13,7 @@ from ..log import getLogger
 from ..timeout import Timeout
 from ..util.misc import which
 from .tube import tube
+import six
 
 log = getLogger(__name__)
 
@@ -201,10 +203,10 @@ class process(tube):
         # - Must be a list/tuple of strings
         # - Each string must not contain '\x00'
         #
-        if isinstance(argv, (str, unicode)):
+        if isinstance(argv, (str, six.text_type)):
             argv = [argv]
 
-        if not all(isinstance(arg, (str, unicode)) for arg in argv):
+        if not all(isinstance(arg, (str, six.text_type)) for arg in argv):
             log.error("argv must be strings: %r" % argv)
 
         # Create a duplicate so we can modify it
@@ -260,10 +262,10 @@ class process(tube):
         # Create a duplicate so we can modify it safely
         env = dict(env or os.environ)
 
-        for k,v in env.items():
-            if not isinstance(k, (str, unicode)):
+        for k,v in list(env.items()):
+            if not isinstance(k, (str, six.text_type)):
                 log.error('Environment keys must be strings: %r' % k)
-            if not isinstance(k, (str, unicode)):
+            if not isinstance(k, (str, six.text_type)):
                 log.error('Environment values must be strings: %r=%r' % (k,v))
             if '\x00' in k[:-1]:
                 log.error('Inappropriate nulls in env key: %r' % (k))
@@ -348,7 +350,8 @@ class process(tube):
 
         try:
             data = self.proc.stdout.read(numb)
-        except IOError as (err, strerror):
+        except IOError as xxx_todo_changeme:
+            (err, strerror) = xxx_todo_changeme.args
             pass
 
         if not data:

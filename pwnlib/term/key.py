@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from six.moves import map
+import six
+from six.moves import zip
 __all__ = ['getch', 'getraw', 'get', 'unget']
 
 import errno
@@ -10,7 +14,7 @@ from . import keyconsts as kc
 from . import termcap
 
 try:    _fd = sys.stdin.fileno()
-except Exception: _fd = file('/dev/null', 'r').fileno()
+except Exception: _fd = open('/dev/null', 'r').fileno()
 
 def getch(timeout = 0):
     while True:
@@ -133,7 +137,7 @@ class Key:
         return self.__str__()
 
     def __eq__(self, other):
-        if   isinstance(other, (unicode, str)):
+        if   isinstance(other, (six.text_type, str)):
             return Matcher(other)(self)
         elif isinstance(other, Matcher):
             return other(self)
@@ -202,7 +206,7 @@ def _init_ti_table():
             continue
         k = _name_to_key(fname)
         if k:
-            _ti_table.append((map(ord, seq), k))
+            _ti_table.append((list(map(ord, seq)), k))
 
 # csi
 def _parse_csi(offset):

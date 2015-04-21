@@ -1,6 +1,9 @@
+from __future__ import absolute_import
 import string
 
 from . import packing
+import six
+from six.moves import range
 
 
 # Taken from https://en.wikipedia.org/wiki/De_Bruijn_sequence but changed to a generator
@@ -101,7 +104,7 @@ def cyclic_find(subseq, alphabet = string.ascii_lowercase, n = None):
     if any(c not in alphabet for c in subseq):
         return -1
 
-    if isinstance(subseq, (int, long)):
+    if isinstance(subseq, six.integer_types):
         width = n * 8 or 'all'
         subseq = packing.pack(subseq, width, 'little', False)
 

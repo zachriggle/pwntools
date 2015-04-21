@@ -3,6 +3,7 @@
 """
 Timeout encapsulation, complete with countdowns and scope managers.
 """
+from __future__ import absolute_import
 import time
 
 import pwnlib

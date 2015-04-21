@@ -142,7 +142,7 @@ class Buffer(Exception):
         """
         # Fast path, get all of the data
         if want >= self.size:
-            data   = ''.join(self.data)
+            data   = b''.join(self.data)
             self.size = 0
             self.data = []
             return data

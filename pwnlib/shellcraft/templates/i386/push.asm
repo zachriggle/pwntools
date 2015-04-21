@@ -1,4 +1,5 @@
 <%
+  from six import integer_types, string_types
   from pwnlib.util import packing
   from pwnlib.shellcraft import i386
   from pwnlib import constants
@@ -46,7 +47,7 @@ Example:
   # There are no meaningful constants of length < 3.
   # There are however constants such as EBP, which we would
   # prefer to avoid.
-  if isinstance(value, (str, unicode)) and len(value) > 3:
+  if isinstance(value, string_types) and len(value) > 3:
     try:
       with ctx.local(arch = 'i386'):
         value = constants.eval(value)
@@ -54,7 +55,7 @@ Example:
       pass
 %>
 
-% if isinstance(value, (int,long)):
+% if isinstance(value, integer_types):
     /* push ${repr(value_orig)} */
     ${re.sub(r'^\s*/.*\n', '', i386.pushstr(packing.pack(value), False), 1)}
 % else:

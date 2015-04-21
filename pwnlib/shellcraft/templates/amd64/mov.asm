@@ -1,4 +1,5 @@
 <%
+  from six import integer_types
   from pwnlib.util import lists, packing, fiddling, misc
   from pwnlib import constants
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
@@ -141,7 +142,7 @@ else:
     % else:
     mov ${dest}, ${src}
     % endif
-% elif isinstance(src, (int, long)):
+% elif isinstance(src, integer_types):
 ## Special case for zeroes
 ## XORing the 32-bit register clears the high 32 bits as well
     % if src == 0:

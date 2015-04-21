@@ -1,4 +1,6 @@
+from __future__ import absolute_import
 import os
+import platform
 from collections import defaultdict
 
 __all__ = ['make_function']
@@ -34,9 +36,10 @@ def init_mako():
     render_global = IsInside()
 
     curdir = os.path.dirname(os.path.abspath(__file__))
+    version = platform.python_version()
     lookup = TemplateLookup(
         directories      = [os.path.join(curdir, 'templates')],
-        module_directory = os.path.expanduser('~/.binjitsu-cache/mako')
+        module_directory = os.path.expanduser('~/.binjitsu-cache-%s/mako' % version)
     )
 
     # The purpose of this definition is to create a new Tag.
@@ -107,13 +110,14 @@ def make_function(funcname, filename, directory):
     # It would be possible to simply create an (*args, **kwargs) wrapper,
     # but what would not have the right signature.
     # While we are at it, we insert the docstring too
-    exec '''
+    docstring    = inspect.cleandoc(template.module.__doc__ or '')
+    template_str = '''
 def wrap(template, render_global):
-    def %s(%s):
-        %r
+    def %(funcname)s(%(args)s):
+        %(docstring)r
         with render_global.go_inside() as was_inside:
-            lines = template.render(%s).split('\\n')
-        for i in xrange(len(lines)):
+            lines = template.render(%(args_used)s).split('\\n')
+        for i in range(len(lines)):
             line = lines[i]
             def islabelchar(c):
                 return c.isalnum() or c == '.' or c == '_'
@@ -132,8 +136,13 @@ def wrap(template, render_global):
             return s
         else:
             return s + '\\n'
-    return %s
-''' % (funcname, args, inspect.cleandoc(template.module.__doc__ or ''), args_used, funcname)
+    return %(funcname)s
+''' % locals()
+    g = {}
+    exec(template_str, g, g)
+
+    # Python3, wtf?
+    wrap = g['wrap']
 
     # Setting _relpath is a slight hack only used to get better documentation
     res = wrap(template, render_global)

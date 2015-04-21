@@ -1,11 +1,16 @@
 """
 Fetch a LIBC binary based on some heuristics.
 """
+from __future__ import absolute_import
 import codecs
 import json
 import os
 import tempfile
-import urlparse
+
+try:
+    import urlparse
+except:
+    import urllib.parse as urlparse
 
 from .context       import context
 from .elf           import ELF

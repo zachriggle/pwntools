@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import sys
 
 from . import key
@@ -31,7 +32,7 @@ def can_init():
         return False
 
     # Check fancy REPLs
-    mods = sys.modules.keys()
+    mods = list(sys.modules.keys())
     for repl in ['IPython', 'bpython', 'dreampielib']:
         if repl in mods:
             return False

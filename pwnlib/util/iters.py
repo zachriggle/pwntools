@@ -1,6 +1,9 @@
 """
 This module includes and extends the standard module :mod:`itertools`.
 """
+from __future__ import absolute_import
+from six.moves import map
+from six.moves import range
 
 __all__ = [
     'bruteforce'                             ,
@@ -580,7 +583,7 @@ def random_product(*args, **kwargs):
     if kwargs != {}:
         raise TypeError('random_product() does not support argument %s' % kwargs.popitem())
 
-    pools = map(tuple, args) * repeat
+    pools = list(map(tuple, args)) * repeat
     return tuple(random.choice(pool) for pool in pools)
 
 def random_permutation(iterable, r = None):
@@ -622,7 +625,7 @@ def random_combination(iterable, r):
     """
     pool = tuple(iterable)
     n = len(pool)
-    indices = sorted(random.sample(xrange(n), r))
+    indices = sorted(random.sample(range(n), r))
     return tuple(pool[i] for i in indices)
 
 def random_combination_with_replacement(iterable, r):
@@ -646,7 +649,7 @@ def random_combination_with_replacement(iterable, r):
     """
     pool = tuple(iterable)
     n = len(pool)
-    indices = sorted(random.randrange(n) for i in xrange(r))
+    indices = sorted(random.randrange(n) for i in range(r))
     return tuple(pool[i] for i in indices)
 
 def lookahead(n, iterable):
@@ -761,12 +764,12 @@ def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = 
 
     if   method == 'upto' and length > 1:
         iterator = product(alphabet, repeat = 1)
-        for i in xrange(2, length + 1):
+        for i in range(2, length + 1):
             iterator = chain(iterator, product(alphabet, repeat = i))
 
     elif method == 'downfrom' and length > 1:
         iterator = product(alphabet, repeat = length)
-        for i in xrange(length - 1, 1, -1):
+        for i in range(length - 1, 1, -1):
             iterator = chain(iterator, product(alphabet, repeat = i))
 
     elif method == 'fixed':

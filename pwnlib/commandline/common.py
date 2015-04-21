@@ -1,8 +1,10 @@
+from __future__ import absolute_import
 from pwn import *
+from six.moves import map
 
 pwnlib.log.console.stream = sys.stderr
 
-choices = map(str, [16,32,64])
+choices = list(map(str, [16,32,64]))
 choices += list(context.oses)
 choices += list(context.architectures)
 choices += list(context.endiannesses)

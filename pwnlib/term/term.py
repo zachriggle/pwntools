@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from six.moves import map
+import six
+from six.moves import range
 __all__ = ['output', 'init']
 
 # we assume no terminal can display more lines than this
@@ -158,7 +162,8 @@ def do(c, *args):
     if s:
         put(s)
 
-def goto((r, c)):
+def goto(xxx_todo_changeme):
+    (r, c) = xxx_todo_changeme
     do('cup', r - scroll + height - 1, c)
 
 cells = []
@@ -178,7 +183,7 @@ class Handle:
     def delete(self):
         delete(self.h)
 
-STR, CSI, CRLF, BS, CR, SOH, STX, OOB = range(8)
+STR, CSI, CRLF, BS, CR, SOH, STX, OOB = list(range(8))
 def parse_csi(buf, offset):
     i = offset
     while i < len(buf):
@@ -234,10 +239,10 @@ def parse_utf8(buf, offset):
 
 def parse(s):
     global _graphics_mode
-    if isinstance(s, unicode):
+    if isinstance(s, six.text_type):
         s = s.encode('utf8')
     out = []
-    buf = map(ord, s)
+    buf = list(map(ord, s))
     i = 0
     while True:
         if i >= len(buf):
@@ -276,10 +281,10 @@ def parse(s):
                         j = 1
                 x = (OOB, s[i:j + 1])
                 i = j + 1
-            elif c1 in map(ord, '()'): # select G0 or G1
+            elif c1 in list(map(ord, '()')): # select G0 or G1
                 i += 3
                 continue
-            elif c1 in map(ord, '>='): # set numeric/application keypad mode
+            elif c1 in list(map(ord, '>=')): # set numeric/application keypad mode
                 i += 2
                 continue
             elif c1 == ord('P'):
@@ -447,7 +452,7 @@ def render_from(i, force = False, clear_after = False):
     flush()
 
 def redraw():
-    for i in reversed(range(len(cells))):
+    for i in reversed(list(range(len(cells)))):
         row = cells[i].start[0]
         if row - scroll + height - 1 < 0:
             break
@@ -469,7 +474,7 @@ def output(s = '', float = False, priority = 10, frozen = False,
         elif float and priority:
             is_floating = True
             float = priority
-            for i in reversed(range(len(cells))):
+            for i in reversed(list(range(len(cells)))):
                 if cells[i].float <= float:
                     break
         else:

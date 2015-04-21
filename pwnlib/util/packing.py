@@ -30,11 +30,14 @@ Examples:
     >>> with context.local(endian='big'): print repr(p(0x1ff))
     '\xff\x01'
 """
+from __future__ import absolute_import
 import struct
 import sys
 from itertools import product
 
 from ..context import context
+import six
+from six.moves import range
 
 mod = sys.modules[__name__]
 
@@ -100,7 +103,7 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
         endianness = context.endianness
         sign       = context.sign
 
-        if not isinstance(number, (int,long)):
+        if not isinstance(number, six.integer_types):
             raise ValueError("pack(): number must be of type (int,long) (got %r)" % type(number))
 
         if sign not in [True, False]:
@@ -119,7 +122,7 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
                 if sign == False:
                     raise ValueError("pack(): number does not fit within word_size")
                 word_size = ((number + 1).bit_length() | 7) + 1
-        elif not isinstance(word_size, (int, long)) or word_size <= 0:
+        elif not isinstance(word_size, six.integer_types) or word_size <= 0:
             raise ValueError("pack(): word_size must be a positive integer or the string 'all'")
 
         if sign == True:
@@ -134,7 +137,7 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
         # Normalize number and size now that we have verified them
         # From now on we can treat positive and negative numbers the same
         number = number & ((1 << word_size) - 1)
-        byte_size = (word_size + 7) / 8
+        byte_size = int((word_size + 7) / 8)
 
         out = []
 
@@ -194,10 +197,10 @@ def unpack(data, word_size = None, endianness = None, sign = None, **kwargs):
         # Verify that word_size make sense
         if word_size == 'all':
             word_size = len(data) * 8
-        elif not isinstance(word_size, (int, long)) or word_size <= 0:
+        elif not isinstance(word_size, six.integer_types) or word_size <= 0:
             raise ValueError("unpack(): word_size must be a positive integer or the string 'all'")
 
-        byte_size = (word_size + 7) / 8
+        byte_size = int((word_size + 7) / 8)
 
         if byte_size != len(data):
             raise ValueError("unpack(): data must have length %d, since word_size was %d" % (byte_size, word_size))
@@ -270,7 +273,7 @@ def unpack_many(data, word_size = None, endianness = None, sign = None, **kwargs
 #
 # Make individual packers, e.g. _p8lu
 #
-ops   = {'p': struct.pack, 'u': lambda *a: struct.unpack(*a)[0]}
+ops   = {'p': struct.pack, 'u': lambda *a: struct.unpack(*list(map(six.b, a)))[0]}
 sizes = {8:'b', 16:'h', 32:'i', 64:'q'}
 ends  = ['b','l']
 signs = ['s','u']
@@ -482,11 +485,9 @@ def _flat(args, preprocessor, packer):
 
         if isinstance(arg, (list, tuple)):
             out.append(_flat(arg, preprocessor, packer))
-        elif isinstance(arg, str):
-            out.append(arg)
-        elif isinstance(arg, unicode):
-            out.append(arg.encode('utf8'))
-        elif isinstance(arg, (int, long)):
+        elif isinstance(arg, six.string_types):
+            out.append(six.b(arg))
+        elif isinstance(arg, six.integer_types):
             out.append(packer(arg))
         elif isinstance(arg, bytearray):
             out.append(str(arg))

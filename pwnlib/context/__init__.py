@@ -4,6 +4,7 @@
 Implements context management so that nested/scoped contexts and threaded
 contexts work properly and as expected.
 """
+from __future__ import absolute_import
 import collections
 import platform
 import logging
@@ -13,6 +14,7 @@ import threading
 import time
 
 from ..timeout import Timeout
+import six
 
 
 class _devnull(object):
@@ -111,9 +113,9 @@ class _DictStack(object):
     def __eq__(self, other):        return self._current.__eq__(other)
 
     # Required for keyword expansion operator ** to work
-    def keys(self):                 return self._current.keys()
-    def values(self):               return self._current.values()
-    def items(self):                return self._current.items()
+    def keys(self):                 return list(self._current.keys())
+    def values(self):               return list(self._current.values())
+    def items(self):                return list(self._current.items())
 
 
 class _Tls_DictStack(threading.local, _DictStack):
@@ -443,11 +445,11 @@ class ContextType(object):
         for arg in args:
             self.update(**arg)
 
-        for k,v in kwargs.items():
+        for k,v in list(kwargs.items()):
             setattr(self,k,v)
 
     def __repr__(self):
-        v = sorted("%s = %r" % (k,v) for k,v in self._tls._current.items())
+        v = sorted("%s = %r" % (k,v) for k,v in list(self._tls._current.items()))
         return '%s(%s)' % (self.__class__.__name__, ', '.join(v))
 
     def local(self, **kwargs):
@@ -483,7 +485,7 @@ class ContextType(object):
         class LocalContext(object):
             def __enter__(a):
                 self._tls.push()
-                self.update(**{k:v for k,v in kwargs.items() if v is not None})
+                self.update(**{k:v for k,v in list(kwargs.items()) if v is not None})
                 return self
 
             def __exit__(a, *b, **c):
@@ -594,7 +596,7 @@ class ContextType(object):
         # Attempt to perform convenience and legacy compatibility
         # transformations.
         transform = {'x86':'i386', 'ppc': 'powerpc', 'x86_64': 'amd64'}
-        for k, v in transform.items():
+        for k, v in list(transform.items()):
             if arch.startswith(k):
                 arch = arch.replace(k,v,1)
 
@@ -603,7 +605,7 @@ class ContextType(object):
         except KeyError:
             raise AttributeError('AttributeError: arch must be one of %r' % sorted(ContextType.architectures))
 
-        for k,v in ContextType.architectures[arch].items():
+        for k,v in list(ContextType.architectures[arch].items()):
             if k not in self._tls:
                 self._tls[k] = v
 
@@ -759,7 +761,7 @@ class ContextType(object):
         except AttributeError:  pass
 
         # Otherwise, fail
-        level_names = filter(lambda x: isinstance(x,str), logging._levelNames)
+        level_names = [x for x in logging._levelNames if isinstance(x,str)]
         permitted = sorted(level_names)
         raise AttributeError('log_level must be an integer or one of %r' % permitted)
 
@@ -789,7 +791,7 @@ class ContextType(object):
             >>> file('bar.txt').readlines()[-1] #doctest: +ELLIPSIS
             '...:DEBUG:...:Hello from bar!\n'
         """
-        if isinstance(value, (str,unicode)):
+        if isinstance(value, (str,six.text_type)):
             modes = ('w', 'wb', 'a', 'ab')
             # check if mode was specified as "[value],[mode]"
             if ',' not in value:

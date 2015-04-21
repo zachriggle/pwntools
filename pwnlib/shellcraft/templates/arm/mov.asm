@@ -1,4 +1,5 @@
 <%
+  from six import integer_types
   from pwnlib.shellcraft import common
   from pwnlib import constants
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
@@ -36,13 +37,13 @@ Args:
 <%
 if not dst in regs:
     log.error('%r is not a register' % str(dst))
-    
+
 if not src in regs:
     with ctx.local(arch = 'arm'):
         src = constants.eval(src)
 
 %>
-%if not isinstance(src, (int, long)):
+%if not isinstance(src, integer_types):
     mov ${dst}, ${src}
 %else:
     /* Set ${dst} = ${src} = 0x${'%x' % src} */

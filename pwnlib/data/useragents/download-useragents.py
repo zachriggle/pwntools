@@ -2,6 +2,7 @@
 """
 Script for downloading lists of user agent strings
 """
+from __future__ import absolute_import
 import os
 import re
 import urllib

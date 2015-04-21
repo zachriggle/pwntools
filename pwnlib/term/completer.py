@@ -1,7 +1,9 @@
+from __future__ import absolute_import
 import os
 import re
 
 from . import readline
+from six.moves import map
 
 
 class Completer:
@@ -67,7 +69,7 @@ class LongestPrefixCompleter(WordCompleter):
         if cs == []:
             return cs
         lcp = word
-        shortest = min(map(len, cs))
+        shortest = min(list(map(len, cs)))
         while len(lcp) < shortest:
             i = len(lcp)
             ch = cs[0][i]
@@ -128,7 +130,7 @@ class PathCompleter(Completer):
         if not cs:
             return
         lcp = buffer_left
-        shortest = min(map(len, cs))
+        shortest = min(list(map(len, cs)))
         while len(lcp) < shortest:
             i = len(lcp)
             ch = cs[0][i]

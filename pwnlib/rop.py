@@ -1,5 +1,6 @@
 """Return Oriented Programming
 """
+from __future__ import absolute_import
 import hashlib
 import os
 import re
@@ -9,6 +10,9 @@ import tempfile
 from .elf import ELF
 from .log import getLogger
 from .util import packing
+import six
+from six.moves import map
+from six.moves import range
 
 log = getLogger(__name__)
 
@@ -41,7 +45,7 @@ class ROP(object):
         # Permit singular ROP(elf) vs ROP([elf])
         if isinstance(elfs, ELF):
             elfs = [elfs]
-        elif isinstance(elfs, (str, unicode)):
+        elif isinstance(elfs, (str, six.text_type)):
             elfs = [ELF(elfs)]
 
         self.elfs  = elfs
@@ -64,7 +68,7 @@ class ROP(object):
             for elf in self.elfs:
                 if resolvable in elf.symbols:
                     return elf.symbols[resolvable]
-        if isinstance(resolvable, (int,long)):
+        if isinstance(resolvable, six.integer_types):
             return resolvable
         return None
 
@@ -81,7 +85,7 @@ class ROP(object):
             (if there's one at that address), or an empty string.
         """
         for elf in self.elfs:
-            for name, addr in elf.symbols.items():
+            for name, addr in list(elf.symbols.items()):
                 if addr == value:
                     return name
 
@@ -92,10 +96,10 @@ class ROP(object):
     def _output_struct(self, value, output):
         next_index = len(output)
 
-        if isinstance(value, (int, long)):
+        if isinstance(value, six.integer_types):
             return value
-        elif isinstance(value, (unicode, str)):
-            if isinstance(value, unicode):
+        elif isinstance(value, (six.text_type, str)):
+            if isinstance(value, six.text_type):
                 value = value.encode('utf8')
 
             while True:
@@ -165,7 +169,7 @@ class ROP(object):
         # the second-to-last call.
         if len(chain) > 1 and not chain[-1][2] and chain[-2][2]:
             # This optimization does not work if a raw string is on the stack
-            if not isinstance(chain[-1][0], (str, unicode)):
+            if not isinstance(chain[-1][0], (str, six.text_type)):
                 chain[-2][1] = [chain[-1][0]]
                 chain[-2][3] = 0
                 chain.pop()
@@ -216,7 +220,7 @@ class ROP(object):
             for i, l in enumerate(rop):
                 addrs[i] = addr
                 for v in l:
-                    if isinstance(v, (int, long, tuple)):
+                    if isinstance(v, (int, int, tuple)):
                         addr += self.align
                     else:
                         addr += len(v)
@@ -227,7 +231,7 @@ class ROP(object):
         out = []
         for l in rop:
             for v in l:
-                if isinstance(v, (int, long)):
+                if isinstance(v, six.integer_types):
                     out.append((addr, v, False))
                     addr += self.align
                 elif isinstance(v, str):
@@ -267,7 +271,7 @@ class ROP(object):
         for addr, value, was_ref in rop:
             if isinstance(value, str):
                 line   = "0x%04x: %16r" % (addr, value.rstrip('\x00'))
-            elif isinstance(value, (int, long)):
+            elif isinstance(value, six.integer_types):
                 if was_ref:
                     line = "0x%04x: %#16x (%+d)" % (
                         addr,
@@ -366,18 +370,18 @@ class ROP(object):
             return None
 
         log.info_once("Loaded cached gadgets for %r" % elf.file.name)
-        gadgets = eval(file(filename).read())
+        gadgets = eval(open(filename).read())
 
         # Gadgets are saved with their 'original' load addresses.
-        gadgets = {k-elf.load_addr+elf.address:v for k,v in gadgets.items()}
+        gadgets = {k-elf.load_addr+elf.address:v for k,v in list(gadgets.items())}
 
         return gadgets
 
     def __cache_save(self, elf, data):
         # Gadgets need to be saved with their 'original' load addresses.
-        data = {k+elf.load_addr-elf.address:v for k,v in data.items()}
+        data = {k+elf.load_addr-elf.address:v for k,v in list(data.items())}
 
-        file(self.__get_cachefile_name(elf),'w+').write(repr(data))
+        open(self.__get_cachefile_name(elf),'w+').write(repr(data))
 
     def __load(self):
         """Load all ROP gadgets for the selected ELF files"""
@@ -408,7 +412,7 @@ class ROP(object):
         # >>> valid('add esp, 0x24')
         # True
         #
-        valid = lambda insn: any(map(lambda pattern: pattern.match(insn), [pop,add,ret,leave]))
+        valid = lambda insn: any([pattern.match(insn) for pattern in [pop,add,ret,leave]])
 
         #
         # Currently, ropgadget.args.Args() doesn't take any arguments, and pulls
@@ -467,7 +471,7 @@ class ROP(object):
 
         frame_regs = ['ebp','esp'] if self.align == 4 else ['rbp','rsp']
 
-        for addr,insns in gadgets.items():
+        for addr,insns in list(gadgets.items()):
             sp_move = 0
             regs = []
             for insn in insns:
@@ -538,7 +542,7 @@ class ROP(object):
         # Search for an exact match, save the closest match
         closest = None
         closest_val = (float('inf'), float('inf'), float('inf'))
-        for a,i in self.gadgets.items():
+        for a,i in list(self.gadgets.items()):
             cur_regs = set(i['regs'])
             if regs == cur_regs and move == i['move']:
                 return (a, i)
@@ -600,7 +604,7 @@ class ROP(object):
         #
         x86_suffixes = ['ax', 'bx', 'cx', 'dx', 'bp', 'sp', 'di', 'si',
                         'r8', 'r9', '10', '11', '12', '13', '14', '15']
-        if all(map(lambda x: x[-2:] in x86_suffixes, attr.split('_'))):
+        if all([x[-2:] in x86_suffixes for x in attr.split('_')]):
             return self.search(regs = attr.split('_'), order = 'regs')
 
         #

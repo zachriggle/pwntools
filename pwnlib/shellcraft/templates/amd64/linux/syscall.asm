@@ -1,4 +1,5 @@
 <%
+  from six import string_types
   from pwnlib.shellcraft import amd64
   from pwnlib.context import context as ctx # Ugly hack, mako will not let it be called context
 %>
@@ -72,7 +73,7 @@ Example:
 </%docstring>
 <%
   append_cdq = False
-  if isinstance(syscall, (str, unicode)) and syscall.startswith('SYS_'):
+  if isinstance(syscall, string_types) and syscall.startswith('SYS_'):
       syscall_repr = syscall[4:] + "(%s)"
       args = []
   else:
