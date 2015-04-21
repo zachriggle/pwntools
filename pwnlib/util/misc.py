@@ -260,19 +260,19 @@ def sh_string(s):
 
     Examples:
 
-        >>> print sh_string('foobar')
+        >>> print(sh_string('foobar'))
         foobar
-        >>> print sh_string('foo bar')
+        >>> print(sh_string('foo bar'))
         'foo bar'
-        >>> print sh_string("foo'bar")
+        >>> print(sh_string("foo'bar"))
         "foo'bar"
-        >>> print sh_string("foo\\\\bar")
+        >>> print(sh_string("foo\\\\bar"))
         'foo\\bar'
-        >>> print sh_string("foo\\\\'bar")
+        >>> print(sh_string("foo\\\\'bar"))
         "foo\\\\'bar"
-        >>> print sh_string("foo\\x01'bar")
+        >>> print(sh_string("foo\\x01'bar"))
         "$( (echo Zm9vASdiYXI=|(base64 -d||openssl enc -d -base64)||echo -en 'foo\\x01\\x27bar') 2>/dev/null)"
-        >>> print subprocess.check_output("echo -n " + sh_string("foo\\\\'bar"), shell = True)
+        >>> print(subprocess.check_output("echo -n " + sh_string("foo\\\\'bar"), shell = True))
         foo\\'bar
     """
 

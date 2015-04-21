@@ -192,7 +192,7 @@ class Thread(threading.Thread):
         i386
         mips
         >>> # Note that the main Thread's context is unchanged
-        >>> print context.arch
+        >>> print(context.arch)
         arm
         >>> # Note that a context-aware Thread receives a copy of the context
         >>> t = pwnlib.context.Thread(target=p)
@@ -200,7 +200,7 @@ class Thread(threading.Thread):
         arm
         mips
         >>> # Again, the main thread is unchanged
-        >>> print context.arch
+        >>> print(context.arch)
         arm
 
     Implementation Details:
@@ -471,7 +471,7 @@ class ContextType(object):
             >>> context.timeout = 1
             >>> context.timeout == 1
             True
-            >>> print context.timeout
+            >>> print(context.timeout)
             1.0
             >>> with context.local(timeout = 2):
             ...     print context.timeout
@@ -479,7 +479,7 @@ class ContextType(object):
             ...     print context.timeout
             2.0
             3.0
-            >>> print context.timeout
+            >>> print(context.timeout)
             1.0
         """
         class LocalContext(object):

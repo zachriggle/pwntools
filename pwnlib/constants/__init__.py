@@ -5,11 +5,11 @@ different architectures and operating systems.
 
 Example:
 
-    >>> print constants.freebsd.SYS_stat
+    >>> print(constants.freebsd.SYS_stat)
     188
-    >>> print constants.linux.i386.SYS_stat
+    >>> print(constants.linux.i386.SYS_stat)
     106
-    >>> print constants.linux.amd64.SYS_stat
+    >>> print(constants.linux.amd64.SYS_stat)
     4
 
 The submodule ``freebsd`` contains all constants for FreeBSD, while the

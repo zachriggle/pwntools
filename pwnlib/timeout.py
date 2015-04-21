@@ -89,7 +89,7 @@ class Timeout(object):
         0.3
         0.2
         0.1
-        >>> print t.timeout
+        >>> print(t.timeout)
         5.0
         >>> with t.local(0.5):
         ...     for i in range(5):
@@ -100,7 +100,7 @@ class Timeout(object):
         0.5
         0.5
         0.5
-        >>> print t.timeout
+        >>> print(t.timeout)
         5.0
     """
 
