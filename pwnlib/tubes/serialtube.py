@@ -98,7 +98,7 @@ class serialtube(tube.tube):
     def shutdown_raw(self, direction):
         self.close()
 
-    def interactive(self, prompt = term.text.bold_red('$') + b' '):
+    def interactive(self, prompt = term.text.bold_red('$') + ' '):
         self.info('Switching to interactive mode')
 
         # We would like a cursor, please!

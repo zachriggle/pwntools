@@ -42,16 +42,17 @@ def search_by_build_id(hex_encoded_id):
     url_base = "https://gitlab.com/libcdb/libcdb/raw/master/hashes/build_id/"
     url      = urlparse.urljoin(url_base, hex_encoded_id)
 
-    data   = ""
+    data   = b""
     while not data.startswith(b'\x7fELF'):
         data = wget(url)
 
         if not data:
             return None
 
-        if data.startswith('..'):
+        if data.startswith(b'..'):
+            data2 = data.decode()
             url = os.path.dirname(url) + '/'
-            url = urlparse.urljoin(url, data)
+            url = urlparse.urljoin(url, data2)
 
     write(cache, data)
     return cache

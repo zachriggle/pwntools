@@ -191,7 +191,7 @@ class ssh_channel(sock):
             time.sleep(0.05)
         return False
 
-    def interactive(self, prompt = term.text.bold_red('$') + b' '):
+    def interactive(self, prompt = term.text.bold_red('$') + ' '):
         """interactive(prompt = pwnlib.term.text.bold_red('$') + ' ')
 
         If not in TTY-mode, this does exactly the same as

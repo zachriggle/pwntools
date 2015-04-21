@@ -73,7 +73,7 @@ def size(n, abbriv = 'B', si = False):
         >>> [size(1024 ** n) for n in range(7)]
         ['1B', '1.00KB', '1.00MB', '1.00GB', '1.00TB', '1.00PB', '1024.00PB']
     """
-    if isinstance(n, str):
+    if isinstance(n, six.string_types) or isinstance(n, six.binary_type):
         n = len(n)
 
     base = 1000.0 if si else 1024.0

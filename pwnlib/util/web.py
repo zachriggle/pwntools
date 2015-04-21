@@ -51,7 +51,7 @@ def wget(url, save=None, timeout=5, **kwargs):
             chunk_size *= 1000
 
         # Count chunks as they're received
-        total_data    = ''
+        total_data    = b''
 
         # Loop until we have all of the data
         for chunk in response.iter_content(chunk_size = 2**10):
