@@ -1117,7 +1117,8 @@ class tube(Timeout, Logger):
             >>> def p(x): print(x)
             >>> t = tube()
             >>> t.shutdown_raw = p
-            >>> _=map(t.shutdown, ('in', 'read', 'recv', 'out', 'write', 'send'))
+            >>> for direction in ('in', 'read', 'recv', 'out', 'write', 'send'):
+            ...     t.shutdown(direction)
             recv
             recv
             recv
@@ -1147,10 +1148,11 @@ class tube(Timeout, Logger):
 
         Doctest:
 
-            >>> def p(x): print x
+            >>> def p(x): print(x)
             >>> t = tube()
             >>> t.connected_raw = p
-            >>> _=map(t.connected, ('any', 'in', 'read', 'recv', 'out', 'write', 'send'))
+            >>> for direction in ('any', 'in', 'read', 'recv', 'out', 'write', 'send'):
+            ...     t.connected(direction)
             any
             recv
             recv
