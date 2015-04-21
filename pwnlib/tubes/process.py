@@ -171,10 +171,11 @@ class process(tube):
                                          stdout = stdout,
                                          stderr = stderr,
                                          close_fds = close_fds,
-                                         preexec_fn = self.preexec_fn)
+                                         preexec_fn = self.preexec_fn,
+                                         universal_newlines=False)
 
         if master:
-            self.proc.stdout = os.fdopen(master)
+            self.proc.stdout = os.fdopen(master, 'rb')
             os.close(stdout)
 
         # Set in non-blocking mode so that a call to call recv(1000) will

@@ -101,7 +101,7 @@ def read(path):
         '\x01\x02\xff\x04'
     """
     path = os.path.expanduser(os.path.expandvars(path))
-    with open(path) as fd:
+    with open(path, 'rb') as fd:
         return fd.read()
 
 
@@ -119,7 +119,7 @@ def write(path, data = '', create_dir = False):
     if create_dir:
         path = os.path.realpath(path)
         mkdir_p(os.path.dirname(path))
-    with open(path, 'w') as f:
+    with open(path, 'wb') as f:
         f.write(data)
 
 def which(name, all = False):

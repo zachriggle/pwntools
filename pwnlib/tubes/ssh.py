@@ -1052,7 +1052,7 @@ os.execve(exe, argv, env)
 
         """
         with self.progress('Downloading %r' % remote) as p:
-            with open(self._download_to_cache(remote, p)) as fd:
+            with open(self._download_to_cache(remote, p), 'rb') as fd:
                 return fd.read()
 
     def download_file(self, remote, local = None):
@@ -1114,7 +1114,7 @@ os.execve(exe, argv, env)
             local_tar = tempfile.NamedTemporaryFile(suffix='.tar.gz')
             self.download_file(remote_tar, local_tar.name)
 
-            tar = tarfile.open(local_tar.name)
+            tar = tarfile.open(local_tar.name, 'rb')
             tar.extractall(local)
 
 
@@ -1173,7 +1173,7 @@ os.execve(exe, argv, env)
             if self.cwd:
                 remote = os.path.join(self.cwd, remote)
 
-        with open(filename) as fd:
+        with open(filename, 'rb') as fd:
             data = fd.read()
 
         self.info("Uploading %r to %r" % (filename,remote))

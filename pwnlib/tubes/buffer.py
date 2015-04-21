@@ -19,8 +19,8 @@ class Buffer(Exception):
         'AAAAAAAAABBBBBBBBBB'
         >>> len(b)
         0
-        >>> b.get(1)
-        ''
+        >>> b.get(1) == b''
+        True
 
     Implementation Details:
 
@@ -155,7 +155,7 @@ class Buffer(Exception):
             i    += 1
 
         # Join the chunks, evict from the buffer
-        data   = ''.join(self.data[:i])
+        data   = b''.join(self.data[:i])
         self.data = self.data[i:]
 
         # If the last chunk puts us over the limit,

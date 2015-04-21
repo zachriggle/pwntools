@@ -528,7 +528,7 @@ class ELF(ELFFile):
         """Retrieve the raw data from the ELF file.
 
         >>> bash = ELF(which('bash'))
-        >>> fd   = open(which('bash'))
+        >>> fd   = open(which('bash'), 'rb')
         >>> bash.get_data() == fd.read()
         True
         """

@@ -12,7 +12,7 @@ def generate(self):
 
     curdir, _ = os.path.split(__file__)
     path = os.path.join(curdir, '..', 'data', 'crcsums.txt')
-    with open(path) as fd:
+    with open(path, 'rb') as fd:
         data = fd.read()
     out = {}
     def fixup(s):
