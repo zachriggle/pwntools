@@ -300,18 +300,21 @@ def attach(target, execute = None, exe = None, need_ptrace_scope = True):
 
         if context.os == 'android':
             pre += 'set gnutarget ' + _bfdname() + '\n'
-    else:
+    elif not isinstance(target, tubes.process.process):
         # If ptrace_scope is set and we're not root, we cannot attach to a
-        # running process.
+        # running process*.
+        #
         # We assume that we do not need this to be set if we are debugging on
         # a different architecture (e.g. under qemu-user).
+        #
+        # *Unless the process explicitly called PR_SET_PTRACER, which is something
+        # that we do for all processes that we launch.
         try:
             ptrace_scope = open('/proc/sys/kernel/yama/ptrace_scope').read().strip()
             if need_ptrace_scope and ptrace_scope != '0' and os.geteuid() != 0:
                 msg =  'Disable ptrace_scope to attach to running processes.\n'
                 msg += 'More info: https://askubuntu.com/q/41629'
-                log.warning(msg)
-                return
+                log.warn_once(msg)
         except IOError:
             pass
 

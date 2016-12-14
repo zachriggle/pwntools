@@ -369,6 +369,15 @@ class process(tube):
             except:
                 pass
 
+        # Avoid issues with attaching to processes when yama-ptrace is set
+        try:
+            PR_SET_PTRACER = 0x59616d61
+            PR_SET_PTRACER_ANY = -1
+            ctypes.CDLL('libc.so.6').prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)
+        except:
+            pass
+
+
         if self.alarm is not None:
             signal.alarm(self.alarm)
 
@@ -787,8 +796,24 @@ class process(tube):
 
     @property
     def corefile(self):
+        """Drops a core file for the process.
+
+        Example:
+
+            >>> e = ELF('/bin/sh')
+            >>> p = process(e.path)
+            >>> c = p.corefile
+            >>> c.read(e.address, 4)
+            '\x7fELF'
+        """
         filename = 'core.%i' % (self.pid)
-        process(['gcore', '-o', 'core', str(self.pid)]).wait()
+
+        gcore = process(['gcore', '-o', 'core', str(self.pid)])
+
+        data = gcore.recvall()
+
+        if gcore.poll() != 0:
+            log.error(data)
 
         import pwnlib.elf.corefile
         return pwnlib.elf.corefile.Core(filename)
@@ -799,6 +824,13 @@ class process(tube):
         Arguments:
             address(int): Address to leak memory at
             count(int): Number of bytes to leak at that address.
+
+        Example:
+
+            >>> e = ELF('/bin/sh')
+            >>> p = process(e.path)
+            >>> p.leak(e.address, 4)
+            '\7xELF'
         """
         # If it's running under qemu-user, don't leak anything.
         if 'qemu-' in os.path.realpath('/proc/%i/exe' % self.pid):
