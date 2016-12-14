@@ -815,6 +815,9 @@ class process(tube):
         if gcore.poll() != 0:
             log.error(data)
 
+        if not os.path.exists(filename):
+            log.error("Could not generate corefile:\n%s" % data)
+
         import pwnlib.elf.corefile
         return pwnlib.elf.corefile.Core(filename)
 
