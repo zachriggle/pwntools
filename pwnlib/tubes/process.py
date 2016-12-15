@@ -803,8 +803,8 @@ class process(tube):
             >>> e = ELF('/bin/sh')
             >>> p = process(e.path)
             >>> c = p.corefile
-            >>> c.read(e.address, 4)
-            '\x7fELF'
+            >>> c.vsyscall
+            Mapping('[vsyscall]', 0xffffffffff600000, 0xffffffffff601000, 0x1000, 0x5)
         """
         filename = 'core.%i' % (self.pid)
 
