@@ -135,7 +135,7 @@ class Mapping(object):
         self.flags=flags
 
         #: :class:`str`: Path to the file that backs the mapping, or ``None``
-        self.path=name if name.startswith('/') else None
+        self.path=name if name and name.startswith('/') else None
 
     @property
     def address(self):
@@ -289,13 +289,14 @@ class Corefile(ELF):
         >>> io = process(elf.path, env={'HELLO': 'WORLD'})
         >>> io.poll(block=True) == -signal.SIGSEGV
         True
+        >>> time.sleep(1)
         >>> core = Corefile('./core')
 
         The core file has a :attr:`.Corefile.exe` property, which is a :class:`.Mapping`
         object.  Each mapping can be accessed with virtual addresses via subscript, or
         contents can be examined via the :attr:`.Mapping.data` attribute.
 
-        >>> core.exe.name == elf.path
+        >>> core.exe.path == elf.path
         True
         >>> core.exe.address == address
         True
@@ -330,7 +331,7 @@ class Corefile(ELF):
         should contain two pointer-widths of NULL bytes, preceded by the NULL-
         terminated path to the executable (as passed via the first arg to ``execve``).
 
-        >>> stack_end = core.exe.name
+        >>> stack_end = core.exe.path
         >>> stack_end += '\x00' * (1+8)
         >>> core.stack.data.endswith(stack_end)
         True
@@ -344,7 +345,7 @@ class Corefile(ELF):
         >>> core.argc
         1
         >>> core.argv[0] in core.stack
-        >>> core.string(core.argv[0]) == core.exe.name
+        >>> core.string(core.argv[0]) == core.exe.path
         True
 
     """
