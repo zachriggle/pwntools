@@ -117,19 +117,19 @@ class Mapping(object):
     def __init__(self, core, name, start, stop, flags):
         self._core=core
 
-        #: Name of the mapping, e.g. ``'/bin/bash'`` or ``'[vdso]'``.
+        #: :class:`str`: Name of the mapping, e.g. ``'/bin/bash'`` or ``'[vdso]'``.
         self.name=name
 
-        #: First mapped byte in the mapping
+        #: :class:`int`: First mapped byte in the mapping
         self.start=start
 
-        #: First byte after the end of hte mapping
+        #: :class:`int`: First byte after the end of hte mapping
         self.stop=stop
 
-        #: Size of the mapping, in bytes
+        #: :class:`int`: Size of the mapping, in bytes
         self.size=stop-start
 
-        #: Mapping flags, using e.g. ``PROT_READ`` and so on.
+        #: :class:`int`: Mapping flags, using e.g. ``PROT_READ`` and so on.
         self.flags=flags
 
     @property
