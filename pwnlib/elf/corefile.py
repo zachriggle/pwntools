@@ -75,6 +75,8 @@ from pwnlib.elf.datatypes import *
 from pwnlib.elf.elf import ELF
 from pwnlib.log import getLogger
 from pwnlib.tubes.tube import tube
+from pwnlib.util.packing import pack
+from pwnlib.util.packing import unpack_many
 
 log = getLogger(__name__)
 
@@ -132,6 +134,9 @@ class Mapping(object):
         #: :class:`int`: Mapping flags, using e.g. ``PROT_READ`` and so on.
         self.flags=flags
 
+        #: :class:`str`: Path to the file that backs the mapping, or ``None``
+        self.path=name if name.startswith('/') else None
+
     @property
     def address(self):
         """:class:`int`: Alias for :data:`Mapping.start`."""
@@ -164,6 +169,53 @@ class Mapping(object):
     def data(self):
         """:class:`str`: Memory of the mapping."""
         return self._core.read(self.start, self.size)
+
+    def __getitem__(self, item):
+        if isinstance(item, slice):
+            start = int(item.start or self.start)
+            stop  = int(item.stop or self.stop)
+
+            if not (self.start <= start <= stop <= self.stop):
+                log.error("Byte range [%#x:%#x] not within range [%#x:%#x]" \
+                    % (start, stop, self.start, self.stop))
+
+            start -= self.address
+            stop  -= self.address
+
+            return self.data[start:stop:item.step]
+
+        return self.data[int(item) - self.address]
+
+    def __contains__(self, item):
+        return self.start <= item < self.stop
+
+    def find(self, sub, start=None, end=None):
+        """Similar to str.find() but works on our address space"""
+        if start is None:
+            start = self.start
+        if end is None:
+            end = self.stop
+
+        result = self.data.find(sub, start-self.address, end-self.address)
+
+        if result == -1:
+            return result
+
+        return result + self.address
+
+    def rfind(self, sub, start=None, end=None):
+        """Similar to str.rfind() but works on our address space"""
+        if start is None:
+            start = self.start
+        if end is None:
+            end = self.stop
+
+        result = self.data.rfind(sub, start-self.address, end-self.address)
+
+        if result == -1:
+            return result
+
+        return result + self.address
 
 class Corefile(ELF):
     r"""Enhances the inforation available about a corefile (which is an extension
@@ -228,7 +280,8 @@ class Corefile(ELF):
         and ``EIP=0xcafebabe``.
 
         >>> shellcode = 'mov eax, 0xdeadbeef; push 0xcafebabe; ret'
-        >>> elf = ELF.from_assembly(shellcode, vma=0x41410000, arch='i386')
+        >>> address = 0x41410000
+        >>> elf = ELF.from_assembly(shellcode, vma=address, arch='i386')
 
         If we run the binary and then wait for it to exit, we can get its
         core file.
@@ -239,12 +292,22 @@ class Corefile(ELF):
         >>> core = Corefile('./core')
 
         The core file has a :attr:`.Corefile.exe` property, which is a :class:`.Mapping`
-        object.
+        object.  Each mapping can be accessed with virtual addresses via subscript, or
+        contents can be examined via the :attr:`.Mapping.data` attribute.
 
         >>> core.exe.name == elf.path
         True
-        >>> core.exe.address == 0x41410000
+        >>> core.exe.address == address
         True
+
+        For a normal ELF, we would be able to do grab the ELF headers out
+        of memory.  However, the ELF that we built from :meth;`.ELF.from_assembly`
+        loads the ``.text`` segment at its base address.
+
+        >>> core.exe[address:address+4] #doctest: +SKIP
+        '\x7fELF'
+        >>> core.exe.data[:4] #doctest: +SKIP
+        '\x7fELF'
 
         The core file also has registers which can be accessed direclty.
 
@@ -267,17 +330,22 @@ class Corefile(ELF):
         should contain two pointer-widths of NULL bytes, preceded by the NULL-
         terminated path to the executable (as passed via the first arg to ``execve``).
 
-        >>> stack_end = elf.path
+        >>> stack_end = core.exe.name
         >>> stack_end += '\x00' * (1+8)
         >>> core.stack.data.endswith(stack_end)
         True
 
-        We can also directly access the environment variables.
+        We can also directly access the environment variables and arguments.
 
         >>> 'HELLO' in core.env
         True
         >>> core.getenv('HELLO')
         'WORLD'
+        >>> core.argc
+        1
+        >>> core.argv[0] in core.stack
+        >>> core.string(core.argv[0]) == core.exe.name
+        True
 
     """
     def __init__(self, *a, **kw):
@@ -295,7 +363,13 @@ class Corefile(ELF):
         #: variable.
         #:
         #: Note: Use with the :meth:`.ELF.string` method to extract them.
-        self.env      = {}
+        self.env = {}
+
+        #: :class:`list`: List of addresses of arguments on the stack.
+        self.argv = []
+
+        #: :class:`int`: Number of arguments passed
+        self.argc = 0
 
         try:
             super(Core, self).__init__(*a, **kw)
@@ -483,6 +557,9 @@ class Corefile(ELF):
                 self.at_sysinfo_ehdr = value
 
     def _parse_stack(self):
+        # Get a copy of the stack mapping
+        stack = self.stack
+
         # AT_EXECFN is the start of the filename, e.g. '/bin/sh'
         # Immediately preceding is a NULL-terminated environment variable string.
         # We want to find the beginning of it
@@ -490,7 +567,7 @@ class Corefile(ELF):
 
         # Sanity check!
         try:
-            assert self.u8(address) == 0
+            assert stack[address] == '\x00'
         except AssertionError:
             # Something weird is happening.  Just don't touch it.
             return
@@ -500,37 +577,51 @@ class Corefile(ELF):
             # ValueError: 'seek out of range'
             return
 
-        # Find the next NULL, which is 1 byte past the environment variable.
-        while self.u8(address-1) != 0:
-            address -= 1
+        # address is currently set to the NULL terminator of the last
+        # environment variable.
+        address = stack.rfind('\x00', None, address)
 
         # We've found the beginning of the last environment variable.
         # We should be able to search up the stack for the envp[] array to
         # find a pointer to this address, followed by a NULL.
-        last_env_addr = address
-        address &= ~(context.bytes-1)
+        last_env_addr = address + 1
+        p_last_env_addr = stack.find(pack(last_env_addr), None, last_env_addr)
 
-        while self.unpack(address) != last_env_addr:
-            address -= context.bytes
-
-        assert self.unpack(address+context.bytes) == 0
+        # Sanity check that we did correctly find the envp NULL terminator.
+        envp_nullterm = p_last_env_addr+context.bytes
+        assert self.unpack(envp_nullterm) == 0
 
         # We've successfully located the end of the envp[] array.
+        #
         # It comes immediately after the argv[] array, which itself
         # is NULL-terminated.
-        end_of_envp = address+context.bytes
+        #
+        # Now let's find the end of argv
+        p_end_of_argv = stack.rfind(pack(0), None, p_last_env_addr)
 
-        while self.unpack(address - context.bytes) != 0:
-            address -= context.bytes
+        start_of_envp = p_end_of_argv + self.bytes
 
-        start_of_envp = address
+        # Now we can fill in the environment
+        env_pointer_data = stack[start_of_envp:p_last_env_addr+self.bytes]
+        for pointer in unpack_many(env_pointer_data):
+            end = stack.find('=', last_env_addr)
+            name = stack[pointer:end]
+            self.env[name] = pointer
 
-        # Now we can fill in the environment easier.
-        for env in range(start_of_envp, end_of_envp, context.bytes):
-            envaddr = self.unpack(env)
-            value   = self.string(envaddr)
-            name, value = value.split('=', 1)
-            self.env[name] = envaddr + len(name) + 1
+        # May as well grab the arguments off the stack as well.
+        # argc comes immediately before argv[0] on the stack, but
+        # we don't know what argc is.
+        #
+        # It is unlikely that argc is a valid stack address.
+        address = p_end_of_argv - self.bytes
+        while self.unpack(address) in stack:
+            address -= self.bytes
+
+        # address now points at argc
+        self.argc = self.unpack(address)
+
+        # we can extract all of the arguments as well
+        self.argv = unpack_many(stack[address + self.bytes: p_end_of_argv])
 
     @property
     def maps(self):
