@@ -135,6 +135,7 @@ class Mapping(object):
     @property
     def address(self):
         """:class:`int`: Alias for :data:`Mapping.start`."""
+        return self.start
 
     @property
     def permstr(self):
@@ -165,7 +166,7 @@ class Mapping(object):
         return self._core.read(self.start, self.size)
 
 class Corefile(ELF):
-    """Enhances the inforation available about a corefile (which is an extension
+    r"""Enhances the inforation available about a corefile (which is an extension
     of the ELF format) by permitting extraction of information about the mapped
     data segments, and register state.
 
@@ -216,6 +217,67 @@ class Corefile(ELF):
          Mapping('/lib/i386-linux-gnu/ld-2.19.so', start=0xf7712000, stop=0xf7713000, size=0x1000, flags=0x4),
          Mapping('/lib/i386-linux-gnu/ld-2.19.so', start=0xf7713000, stop=0xf7714000, size=0x1000, flags=0x6),
          Mapping('[stack]', start=0xfff3e000, stop=0xfff61000, size=0x23000, flags=0x6)]
+
+    Example:
+
+        The Linux kernel may not overwrite an existing core-file.
+
+        >>> if os.path.exists('core'): os.unlink('core')
+
+        Let's build an example binary which should eat ``EAX=0xdeadbeef``
+        and ``EIP=0xcafebabe``.
+
+        >>> shellcode = 'mov eax, 0xdeadbeef; push 0xcafebabe; ret'
+        >>> elf = ELF.from_assembly(shellcode, vma=0x41410000, arch='i386')
+
+        If we run the binary and then wait for it to exit, we can get its
+        core file.
+
+        >>> io = process(elf.path, env={'HELLO': 'WORLD'})
+        >>> io.poll(block=True) == -signal.SIGSEGV
+        True
+        >>> core = Corefile('./core')
+
+        The core file has a :attr:`.Corefile.exe` property, which is a :class:`.Mapping`
+        object.
+
+        >>> core.exe.name == elf.path
+        True
+        >>> core.exe.address == 0x41410000
+        True
+
+        The core file also has registers which can be accessed direclty.
+
+        >>> core.eip == 0xcafebabe
+        True
+        >>> core.eax == 0xdeadbeef
+        True
+
+        Various other mappings are available by name.  On Linux, 32-bit binaries
+        should have a VDSO section.  Since our ELF is statically linked, there is
+        no libc which gets mapped.
+
+        >>> core.vdso.data[:4] == '\x7fELF'
+        True
+        >>> core.libc is None
+        True
+
+        The corefile also contains a :attr:`.Corefile.stack` property, which gives
+        us direct access to the stack contents.  On Linux, the very top of the stack
+        should contain two pointer-widths of NULL bytes, preceded by the NULL-
+        terminated path to the executable (as passed via the first arg to ``execve``).
+
+        >>> stack_end = elf.path
+        >>> stack_end += '\x00' * (1+8)
+        >>> core.stack.data.endswith(stack_end)
+        True
+
+        We can also directly access the environment variables.
+
+        >>> 'HELLO' in core.env
+        True
+        >>> core.getenv('HELLO')
+        'WORLD'
 
     """
     def __init__(self, *a, **kw):

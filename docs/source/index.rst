@@ -51,7 +51,7 @@ Each of the ``pwntools`` modules is documented here.
    context
    dynelf
    encoders
-   elf
+   elf/*
    exception
    flag
    fmtstr
