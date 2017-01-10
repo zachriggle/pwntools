@@ -28,6 +28,12 @@ setup_travis()
     export PATH=$PWD/usr/bin:$PATH
     export LD_LIBRARY_PATH=$PWD/usr/lib
 
+    # Debugging purposes
+    lsb_release -a
+    ulimit -a
+    uname -a
+    sysctl -a
+
     # Install libbfd-multiarch and libopcodes-multiarch if not found in the cache
     if [ ! -f usr/lib/libbfd-2.22-multiarch.so ];
     then
