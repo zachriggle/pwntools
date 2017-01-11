@@ -509,11 +509,7 @@ class Corefile(ELF):
             core_uses_pid = False
 
         # If there's a pipe program, who knows what can happen.
-        if core_pattern.startswith('|'):
-            log.warn_once("May not be able to locate core dumps, core_pattern is: %r" % core_pattern.replace('%', '%%'))
-            corefile_path = 'core'
-
-        else:
+        if not core_pattern.startswith('|'):
             """
             %%  a single % character
             %c  core file size soft resource limit of crashing process (since Linux 2.6.24)
@@ -547,50 +543,77 @@ class Corefile(ELF):
             pattern = re.compile("|".join(replace.keys()))
             corefile_path = pattern.sub(lambda m: replace[re.escape(m.group(0))], core_pattern)
 
-        # If core_pattern does not specify an absolute path, it will be relative to
-        # the directory that the process was executing in.  We cannot know for sure what
-        # that was, but we can know what it was initially.  Best effort.
-        if os.pathsep not in corefile_path:
-            corefile_path = os.path.join(process.cwd, corefile_path)
+            # If core_pattern does not specify an absolute path, it will be relative to
+            # the directory that the process was executing in.  We cannot know for sure what
+            # that was, but we can know what it was initially.  Best effort.
+            if os.pathsep not in corefile_path:
+                corefile_path = os.path.join(process.cwd, corefile_path)
 
-        # Check to see whether we should append .PID
-        if core_uses_pid:
-            corefile_path += '.%i' % process.pid
+            # Check to see whether we should append .PID
+            if core_uses_pid:
+                corefile_path += '.%i' % process.pid
 
-        # Did we get lucky?
-        if True or not os.path.exists(corefile_path):
-            log.warn("Could not find corefile for PID %i, taking a guess!" % process.pid)
+            # We should have an exact path, as long as we're not piping things.
+            if os.path.isfile(corefile_path):
+                return Corefile._load_core_expect_pid(corefile_path, process.pid)
 
-            apport_path = '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid())
+            log.error("Could not find core file: expected %r" % corefile_path)
 
-            guesses = [
-                Corefile._extract_apport_coredump(apport_path),
-                'core.%i' % process.pid,
-                'core'
-            ]
 
-            for corefile_path in guesses:
-                if not corefile_path or not os.path.isfile(corefile_path):
+        # Everything from here downward deals with "pipe" core_pattern
+        if 'apport' in core_pattern:
+            crash_path = '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid())
+
+            if os.path.isfile(crash_path):
+                corefile_path = Corefile._extract_apport_coredump(apport_path)
+
+                if corefile_path:
+                    # Apport won't write new crashes as long as the old one exists
+                    # so unlink it.
+                    os.unlink(apport_path)
+
+                    # Move the extracted corefile to a persistent location so that
+                    # the user can access it persistently.
+                    new_path = 'core.%s.%i' % (os.path.basename(process.executable),
+                                               process.pid)
+                    os.rename(corefile_path, new_path)
+
+                    # Return the extracted corefile
+                    return Corefile._load_core_expect_pid(new_path, process.pid)
+
+        # Okay, so there's some other pipe going on we don't know about,
+        # **OR** apport isn't dropping crashes in that directory.
+        guesses = [
+            'core.%i' % process.pid,
+            'core'
+        ]
+
+        for corefile_path in guesses:
+            if not corefile_path or not os.path.isfile(corefile_path):
+                continue
+
+            # We may open a bunch of the wrong core file...
+            # Don't spam the user with messages.
+            with context.silent:
+                try:
+                    core = Corefile(corefile_path)
+                except Exception:
                     continue
 
-                # We may open a bunch of the wrong core file...
-                # Don't spam the user with messages.
-                with context.silent:
-                    core = Corefile(corefile_path)
+                if core.pid == process.pid:
+                    break
 
-                    if core.pid == process.pid:
-                        break
+        else:
+            log.error("Could not find core file for PID %i" % (process.pid))
 
-            else:
-                log.error("Could not find core file for PID %i" % (process.pid))
+        return Corefile._load_core_expect_pid(corefile_path, process.pid)
 
-
+    @staticmethod
+    def _load_core_expect_pid(path, pid):
         corefile = Corefile(corefile_path)
-
         if corefile.pid != process.pid:
             log.warn("Core file PIDs do not match! Expected %i, got %i" \
                     % (process.pid, corefile.pid))
-
         return corefile
 
     @staticmethod
