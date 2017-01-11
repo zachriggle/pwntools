@@ -285,7 +285,7 @@ class process(tube):
 
         self.preexec_fn = preexec_fn
         self.display    = display or self.program
-        self.__qemu     = False
+        self._qemu      = False
 
         message = "Starting %s process %r" % (where, self.display)
 
@@ -354,6 +354,17 @@ class process(tube):
                 self.setuid = st.st_uid
             if (st.st_mode & stat.S_ISGID):
                 self.setgid = st.st_gid
+
+        # Try to figure out if the process is running under QEMU, even if
+        # we didn't explicitly invoke it that way -- e.g. if binfmt_helpers
+        # is enabled.
+        if not self._qemu:
+            try:
+                exe = os.readlink('/proc/%i/exe' % self.pid)
+                if exe.startswith('qemu-'):
+                    self._qemu = True
+            except Exception:
+                pass
 
 
     def __preexec_fn(self):
@@ -435,7 +446,7 @@ class process(tube):
             if self.argv:
                 args += ['-0', self.argv[0]]
             args += ['--']
-            self.__qemu = True
+            self._qemu = True
             return [args, qemu]
 
         # If we get here, we couldn't run the binary directly, and
