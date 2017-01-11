@@ -569,14 +569,14 @@ class Corefile(ELF):
                 'core'
             ]
 
-            for guess in guesses:
-                if not guess or not os.path.isfile(guess):
+            for corefile_path in guesses:
+                if not corefile_path or not os.path.isfile(corefile_path):
                     continue
 
                 # We may open a bunch of the wrong core file...
                 # Don't spam the user with messages.
                 with context.silent:
-                    core = Corefile(guess)
+                    core = Corefile(corefile_path)
 
                     if core.pid == process.pid:
                         break
