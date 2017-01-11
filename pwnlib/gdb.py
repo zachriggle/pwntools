@@ -852,7 +852,8 @@ def corefile(process):
         log.warn_once("Skipping corefile since context.noptrace==True")
         return
 
-    temp = tempfile.NamedTemporaryFile(prefix='pwn-corefile-')
+    corefile_path = './core.%s.%i' % (os.path.basename(process.executable),
+                                    process.pid)
 
     # Due to https://sourceware.org/bugzilla/show_bug.cgi?id=16092
     # will disregard coredump_filter, and will not dump private mappings.
@@ -869,7 +870,7 @@ def corefile(process):
                 '-ex', '"set height 0"',
                 '-ex', '"set width 0"',
                 '-ex', '"set use-coredump-filter on"',
-                '-ex', '"generate-core-file %s"' % temp.name,
+                '-ex', '"generate-core-file %s"' % corefile_path,
                 '-ex', 'detach']
 
     with context.local(terminal = ['sh', '-c']):
@@ -877,7 +878,7 @@ def corefile(process):
             pid = attach(process, gdb_args=gdb_args)
             os.waitpid(pid, 0)
 
-    return elf.corefile.Core(temp.name)
+    return elf.corefile.Core(corefile_path)
 
 def version(program='gdb'):
     """Gets the current GDB version.
