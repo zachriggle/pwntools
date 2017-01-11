@@ -530,7 +530,7 @@ class Corefile(ELF):
             replace = {
                 '%%': '%',
                 '%e': os.path.basename(process.executable),
-                '%E': process.executable_segments.replace('/', '!'),
+                '%E': process.executable.replace('/', '!'),
                 '%g': os.getgid(),
                 '%h': socket.gethostname(),
                 '%i': process.pid,
@@ -554,7 +554,7 @@ class Corefile(ELF):
         if core_uses_pid:
             corefile_path += '.%i' % process.pid
 
-        return corefile.path
+        return corefile_path
 
     def _parse_nt_file(self, note):
         t = tube()
