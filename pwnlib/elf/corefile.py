@@ -531,14 +531,14 @@ class Corefile(ELF):
                 '%%': '%',
                 '%e': os.path.basename(process.executable),
                 '%E': process.executable.replace('/', '!'),
-                '%g': os.getgid(),
+                '%g': str(os.getgid()),
                 '%h': socket.gethostname(),
-                '%i': process.pid,
-                '%I': process.pid,
-                '%p': process.pid,
-                '%P': process.pid,
-                '%s': -process.poll(),
-                '%u': os.getuid()
+                '%i': str(process.pid),
+                '%I': str(process.pid),
+                '%p': str(process.pid),
+                '%P': str(process.pid),
+                '%s': str(-process.poll()),
+                '%u': str(os.getuid())
             }
             replace = dict((re.escape(k), v) for k, v in replace.iteritems())
             pattern = re.compile("|".join(replace.keys()))
