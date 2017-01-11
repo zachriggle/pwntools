@@ -507,7 +507,7 @@ class Corefile(ELF):
 
         # If there's a pipe program, who knows what can happen.
         if core_pattern.startswith('|'):
-            log.warn_once("May not be able to locate core dumps, core_pattern is: %r" % core_pattern)
+            log.warn_once("May not be able to locate core dumps, core_pattern is: %r" % core_pattern.replace('%', '%%'))
             corefile_path = 'core'
 
         else:
