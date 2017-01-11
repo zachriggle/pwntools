@@ -64,9 +64,12 @@ from __future__ import absolute_import
 
 import collections
 import ctypes
+import gzip
 import re
 import os
 import socket
+import StringIO
+import tempfile
 
 import elftools
 from elftools.common.py3compat import bytes2str
@@ -80,6 +83,7 @@ from pwnlib.elf.elf import ELF
 from pwnlib.log import getLogger
 from pwnlib.tubes.process import process
 from pwnlib.tubes.tube import tube
+from pwnlib.util.fiddling import b64d
 from pwnlib.util.misc import read
 from pwnlib.util.packing import pack
 from pwnlib.util.packing import unpack_many
@@ -557,14 +561,16 @@ class Corefile(ELF):
         if True or not os.path.exists(corefile_path):
             log.warn("Could not find corefile for PID %i, taking a guess!" % process.pid)
 
+            apport_path = '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid())
+
             guesses = [
-                '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid()),
+                Corefile._extract_apport_coredump(apport_path),
                 'core.%i' % process.pid,
                 'core'
             ]
 
             for guess in guesses:
-                if not os.path.isfile(guess):
+                if not guess or not os.path.isfile(guess):
                     continue
 
                 # We may open a bunch of the wrong core file...
@@ -586,6 +592,38 @@ class Corefile(ELF):
                     % (process.pid, corefile.pid))
 
         return corefile
+
+    @staticmethod
+    def _extract_apport_coredump(path):
+        with open(path, 'rt') as file:
+            # Find the CoreDump
+            for line in file:
+                if line.startswith('CoreDump: base64'):
+                    break
+            else:
+                return
+
+            # Get all of the base64'd lines
+            chunks = []
+            for line in file:
+                if not line.startswith(' '):
+                    break
+                chunks.append(b64d(line))
+
+            # Smush everything together, then extract it
+            compressed_data = ''.join(chunks)
+            compressed_file = StringIO.StringIO(compressed_data)
+            gzip_file = gzip.GzipFile(fileobj=compressed_file)
+            core_data = gzip_file.read()
+
+            # Create a temporary file
+            tmp = tempfile.mktemp(prefix='pwn-core-')
+
+            with open(tmp, 'wb+') as file:
+                file.write(core_data)
+
+            return tmp
+
 
     def _parse_nt_file(self, note):
         t = tube()
