@@ -902,7 +902,10 @@ except Exception:
     pass
 
 # Assume that the user would prefer to have core dumps.
-resource.setrlimit(resource.RLIMIT_CORE, (-1, -1))
+try:
+    resource.setrlimit(resource.RLIMIT_CORE, (-1, -1))
+except Exception:
+    pass
 
 %(func_src)s
 apply(%(func_name)s, %(func_args)r)
