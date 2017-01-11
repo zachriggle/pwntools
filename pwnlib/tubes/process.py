@@ -861,7 +861,7 @@ class process(tube):
 
         Returns an ELF file for the executable that launched the process.
         """
-        import pwnlib.elf
+        import pwnlib.elf.elf
         return pwnlib.elf.elf.ELF(self.executable)
 
     @property
@@ -876,8 +876,13 @@ class process(tube):
             >>> isinstance(proc.corefile, pwnlib.elf.corefile.Core)
             True
         """
-        import pwnlib.gdb
-        return pwnlib.gdb.corefile(self)
+        # If the process is still alive, try using GDB
+        if self.poll() is None:
+            import pwnlib.gdb
+            return pwnlib.gdb.corefile(self)
+
+        import pwnlib.elf.corefile
+        return pwnlib.elf.corefile.Corefile.find_corefile(self)
 
     def leak(self, address, count=1):
         r"""Leaks memory within the process at the specified address.
