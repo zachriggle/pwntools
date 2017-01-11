@@ -299,13 +299,12 @@ class Corefile(ELF):
         Let's build an example binary which should eat ``EAX=0xdeadbeef``
         and ``EIP=0xcafebabe``.
 
-        >>> shellcode = 'mov eax, 0xdeadbeef; push 0xcafebabe; ret'
-        >>> address = 0x41410000
-        >>> elf = ELF.from_assembly(shellcode, vma=address, arch='i386')
-
         If we run the binary and then wait for it to exit, we can get its
         core file.
 
+        >>> shellcode = 'mov eax, 0xdeadbeef; push 0xcafebabe; ret'
+        >>> address = 0x41410000
+        >>> elf = ELF.from_assembly(shellcode, vma=address, arch='i386')
         >>> io = process(elf.path, env={'HELLO': 'WORLD'})
         >>> io.poll(block=True) == -signal.SIGSEGV
         True
@@ -559,7 +558,7 @@ class Corefile(ELF):
             log.warn("Could not find corefile for PID %i, taking a guess!" % process.pid)
 
             guesses = [
-                '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), process.pid),
+                '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid()),
                 'core.%i' % process.pid,
                 'core'
             ]
