@@ -584,6 +584,8 @@ class Corefile(ELF):
         # Okay, so there's some other pipe going on we don't know about,
         # **OR** apport isn't dropping crashes in that directory.
         guesses = [
+            'core.%s.%i' % (os.path.basename(process.executable),
+                            process.pid),
             'core.%i' % process.pid,
             'core'
         ]
