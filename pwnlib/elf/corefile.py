@@ -312,8 +312,12 @@ class Corefile(ELF):
         >>> io = process(elf.path, env={'HELLO': 'WORLD'})
         >>> io.poll(block=True) == -signal.SIGSEGV
         True
-        >>> time.sleep(1)
-        >>> core = Corefile('./core')
+
+        There is a useful helper utility to find the core file for a crashed
+        process.  You can specify a full path a la ``Corefile('/path/to/core')``,
+        though generally the helper will be the most useful.
+
+        >>> core = Corefile.find_core(io)
 
         The core file has a :attr:`.Corefile.exe` property, which is a :class:`.Mapping`
         object.  Each mapping can be accessed with virtual addresses via subscript, or
