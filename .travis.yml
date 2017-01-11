@@ -30,12 +30,9 @@ install:
   - pip install --upgrade --editable .
   - pip install --requirement docs/requirements.txt
 before_script:
-  - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
-  - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
-  - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
-  - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
+  - source travis/before_script.sh
 script:
-  - PWNLIB_NOTERM=1 coverage run -m sphinx -b doctest docs/source docs/build/doctest
+  - source travis/script.sh
 after_success:
   - coveralls
   - source travis/update_demo.sh
