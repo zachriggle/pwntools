@@ -64,6 +64,7 @@ from __future__ import absolute_import
 
 import collections
 import ctypes
+import glob
 import gzip
 import re
 import os
@@ -82,6 +83,7 @@ from pwnlib.elf.datatypes import *
 from pwnlib.elf.elf import ELF
 from pwnlib.log import getLogger
 from pwnlib.tubes.process import process
+from pwnlib.tubes.ssh import ssh_channel
 from pwnlib.tubes.tube import tube
 from pwnlib.util.fiddling import b64d
 from pwnlib.util.misc import read
@@ -481,178 +483,6 @@ class Corefile(ELF):
                     # off the end of the stack.
                     pass
 
-    @staticmethod
-    def find_corefile(process):
-        """find_corefile(process) -> Corefile
-
-        Locate a corefile on disk for the specified process.
-
-        Arguments:
-            process(process): Process instance that we want to find a corefile for.
-
-        Returns:
-            :class:`.Corefile`
-
-        Note:
-            This can only find core files that were created by the kernel, when
-            the process crashed.  To generate a corefile of a *running* process,
-            use :meth:`.process.corefile` or :func:`.gdb.corefile`.
-        """
-        if not process.poll():
-            log.error("Process %i has not exited" % (process.pid))
-
-        core_pattern = read('/proc/sys/kernel/core_pattern').strip()
-        core_uses_pid = bool(int(read('/proc/sys/kernel/core_uses_pid')))
-
-        # From man core(5):
-        # For backward compatibility, if /proc/sys/kernel/core_pattern
-        # does not include %p and /proc/sys/kernel/core_uses_pid (see  below)
-        # is nonzero, then .PID will be appended to the core filename.
-        if '%p' in core_pattern:
-            core_uses_pid = False
-
-        # If there's a pipe program, who knows what can happen.
-        if not core_pattern.startswith('|'):
-            """
-            %%  a single % character
-            %c  core file size soft resource limit of crashing process (since Linux 2.6.24)
-            %d  dump mode—same as value returned by prctl(2) PR_GET_DUMPABLE (since Linux 3.7)
-            %e  executable filename (without path prefix)
-            %E  pathname of executable, with slashes ('/') replaced by exclamation marks ('!') (since Linux 3.0).
-            %g  (numeric) real GID of dumped process
-            %h  hostname (same as nodename returned by uname(2))
-            %i  TID of thread that triggered core dump, as seen in the PID namespace in which the thread resides (since Linux 3.18)
-            %I  TID of thread that triggered core dump, as seen in the initial PID namespace (since Linux 3.18)
-            %p  PID of dumped process, as seen in the PID namespace in which the process resides
-            %P  PID of dumped process, as seen in the initial PID namespace (since Linux 3.12)
-            %s  number of signal causing dump
-            %t  time of dump, expressed as seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)
-            %u  (numeric) real UID of dumped process
-            """
-            replace = {
-                '%%': '%',
-                '%e': os.path.basename(process.executable),
-                '%E': process.executable.replace('/', '!'),
-                '%g': str(os.getgid()),
-                '%h': socket.gethostname(),
-                '%i': str(process.pid),
-                '%I': str(process.pid),
-                '%p': str(process.pid),
-                '%P': str(process.pid),
-                '%s': str(-process.poll()),
-                '%u': str(os.getuid())
-            }
-            replace = dict((re.escape(k), v) for k, v in replace.iteritems())
-            pattern = re.compile("|".join(replace.keys()))
-            corefile_path = pattern.sub(lambda m: replace[re.escape(m.group(0))], core_pattern)
-
-            # If core_pattern does not specify an absolute path, it will be relative to
-            # the directory that the process was executing in.  We cannot know for sure what
-            # that was, but we can know what it was initially.  Best effort.
-            if os.pathsep not in corefile_path:
-                corefile_path = os.path.join(process.cwd, corefile_path)
-
-            # Check to see whether we should append .PID
-            if core_uses_pid:
-                corefile_path += '.%i' % process.pid
-
-            # We should have an exact path, as long as we're not piping things.
-            if os.path.isfile(corefile_path):
-                return Corefile._load_core_expect_pid(corefile_path, process.pid)
-
-            log.error("Could not find core file: expected %r" % corefile_path)
-
-
-        # Everything from here downward deals with "pipe" core_pattern
-        if 'apport' in core_pattern:
-            crash_path = '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid())
-
-            if os.path.isfile(crash_path):
-                corefile_path = Corefile._extract_apport_coredump(crash_path)
-
-                if corefile_path:
-                    # Apport won't write new crashes as long as the old one exists
-                    # so unlink it.
-                    os.unlink(crash_path)
-
-                    # Move the extracted corefile to a persistent location so that
-                    # the user can access it persistently.
-                    new_path = 'core.%s.%i' % (os.path.basename(process.executable),
-                                               process.pid)
-                    os.rename(corefile_path, new_path)
-
-                    # Return the extracted corefile
-                    return Corefile._load_core_expect_pid(new_path, process.pid)
-
-        # Okay, so there's some other pipe going on we don't know about,
-        # **OR** apport isn't dropping crashes in that directory.
-        guesses = [
-            'core.%s.%i' % (os.path.basename(process.executable),
-                            process.pid),
-            'core.%i' % process.pid,
-            'core'
-        ]
-
-        for corefile_path in guesses:
-            if not corefile_path or not os.path.isfile(corefile_path):
-                continue
-
-            # We may open a bunch of the wrong core file...
-            # Don't spam the user with messages.
-            with context.silent:
-                try:
-                    core = Corefile(corefile_path)
-                except Exception:
-                    continue
-
-                if core.pid == process.pid:
-                    break
-
-        else:
-            log.error("Could not find core file for PID %i" % (process.pid))
-
-        return Corefile._load_core_expect_pid(corefile_path, process.pid)
-
-    @staticmethod
-    def _load_core_expect_pid(path, pid):
-        corefile = Corefile(path)
-        if pid != corefile.pid:
-            log.warn("Core file PIDs do not match! Expected %i, got %i" \
-                    % (pid, corefile.pid))
-        return corefile
-
-    @staticmethod
-    def _extract_apport_coredump(path):
-        with open(path, 'rt') as file:
-            # Find the CoreDump
-            for line in file:
-                if line.startswith('CoreDump: base64'):
-                    break
-            else:
-                return
-
-            # Get all of the base64'd lines
-            chunks = []
-            for line in file:
-                if not line.startswith(' '):
-                    break
-                chunks.append(b64d(line))
-
-            # Smush everything together, then extract it
-            compressed_data = ''.join(chunks)
-            compressed_file = StringIO.StringIO(compressed_data)
-            gzip_file = gzip.GzipFile(fileobj=compressed_file)
-            core_data = gzip_file.read()
-
-            # Create a temporary file
-            tmp = tempfile.mktemp(prefix='pwn-core-')
-
-            with open(tmp, 'wb+') as file:
-                file.write(core_data)
-
-            return tmp
-
-
     def _parse_nt_file(self, note):
         t = tube()
         t.unrecv(note.n_desc)
@@ -946,9 +776,282 @@ class Corefile(ELF):
 
         return super(Core, self).__getattribute__(attribute)
 
-
 class Core(Corefile):
     """Alias for :class:`.Corefile`"""
 
 class Coredump(Corefile):
     """Alias for :class:`.Corefile`"""
+
+class CorefileFinder(object):
+    def __init__(self, proc):
+        if proc.poll() is None:
+            log.error("Process %i has not exited" % (process.pid))
+
+        self.process = proc
+        self.pid = proc.pid
+        self.uid = proc.suid
+        self.gid = proc.sgid
+        self.exe = proc.executable
+        self.basename = os.path.basename(self.exe)
+        self.cwd = proc.cwd
+        self.qemu = getattr(proc, '__qemu', False)
+
+        # XXX: Should probably break out all of this logic into
+        #      its own class, so that we can support "file ops"
+        #      locally, via SSH, and over ADB, in a transparent way.
+        if isinstance(proc, process):
+            self.read = read
+            self.unlink = os.unlink
+        elif isinstance(proc, ssh_channel):
+            self.read = proc.parent.read
+            self.ulink = proc.parent.unlink
+
+        self.kernel_core_pattern = self.read('/proc/sys/kernel/core_pattern').strip()
+        self.kernel_core_uses_pid = bool(int(self.read('/proc/sys/kernel/core_uses_pid')))
+
+        if self.qemu:
+            self.core_path = self.qemu_corefile()
+        else:
+            self.core_path = self.native_corefile()
+
+    def load_core_check_pid(self, path):
+        """Test whether a Corefile matches our process
+
+        Speculatively load a Corefile without informing the user, so that we
+        can check if it matches the process we're looking for.
+
+        Arguments:
+            path(str): Path to the corefile on disk
+
+        Returns:
+            `bool`: ``True`` if the Corefile matches, ``False`` otherwise.
+        """
+
+        try:
+            with context.quiet:
+                corefile = Corefile(path)
+
+                if self.pid == corefile.pid:
+                    return True
+        except Exception:
+            pass
+
+        return False
+
+    def apport_corefile(self):
+        """Find the apport crash for the process, and extract the core file.
+
+        Arguments:
+            process(process): Process object we're looking for.
+
+        Returns:
+            `str`: Raw core file contents
+        """
+        crash_data = self.apport_read_crash_data()
+        return apport_crash_extract_corefile(crash_data)
+
+    def apport_crash_extract_corefile(crashfile_data):
+        """Extract a corefile from an apport crash file contents.
+
+        Arguments:
+            crashfile_data(str): Crash file contents
+
+        Returns:
+            `str`: Raw binary data for the core file, or ``None``.
+        """
+        file = StringIO.StringIO(crashfile_data)
+
+        # Find the pid of the crashfile
+        for line in file:
+            if line.startswith(' Pid:'):
+                pid = int(line.split()[-1])
+
+                if pid == self.pid:
+                    break
+        else:
+            # Could not find a " Pid:" line
+            return
+
+        # Find the CoreDump section
+        for line in file:
+            if line.startswith('CoreDump: base64'):
+                break
+        else:
+            # Could not find the coredump data
+            return
+
+        # Get all of the base64'd lines
+        chunks = []
+        for line in file:
+            if not line.startswith(' '):
+                break
+            chunks.append(b64d(line))
+
+        # Smush everything together, then extract it
+        compressed_data = ''.join(chunks)
+        compressed_file = StringIO.StringIO(compressed_data)
+        gzip_file = gzip.GzipFile(fileobj=compressed_file)
+        core_data = gzip_file.read()
+
+        return core_data
+
+    def apport_read_crash_data(self):
+        """Find the apport crash for the process
+
+        Returns:
+            `str`: Raw contents of the crash file or ``None``.
+        """
+        uid = process.suid
+        crash_name = self.exe.replace('/', '_')
+
+        crash_path = '/var/crash/%s.%i.crash' % (crash_name, uid)
+
+        try:
+            data = self.read(crash_path)
+        except Exception:
+            return None
+
+        # Remove the crash file, so that future crashes will be captured
+        try:
+            self.unlink(crash_path)
+        except Exception:
+            pass
+
+        return data
+
+    def native_corefile(self):
+        """Find the corefile for a native crash.
+
+        Arguments:
+            process(process): Process whose crash we should find.
+
+        """
+        if self.kernel_core_pattern.startswith('|'):
+            return self.native_corefile_pipe()
+
+        return self.native_corefile_path()
+
+    def native_corefile_pipe(self):
+        """native_corefile_pipe(self) -> str
+        """
+        # We only support apport
+        if '/apport' not in self.kernel_core_pattern:
+            log.warn_once("Unsupported core_pattern: %r" % self.kernel_core_pattern)
+            return None
+
+        apport_core = self.apport_corefile()
+
+        if apport_core:
+            # Write the corefile to the local directory
+            filename = 'core.%s.%i.apport' % (self.basename, self.pid)
+            with open(filename, 'wb+') as f:
+                f.write(apport_core)
+            return filename
+
+        self.kernel_core_pattern = 'core'
+        return native_corefile_pattern()
+
+    def native_corefile_pattern(self):
+        """
+        %%  a single % character
+        %c  core file size soft resource limit of crashing process (since Linux 2.6.24)
+        %d  dump mode—same as value returned by prctl(2) PR_GET_DUMPABLE (since Linux 3.7)
+        %e  executable filename (without path prefix)
+        %E  pathname of executable, with slashes ('/') replaced by exclamation marks ('!') (since Linux 3.0).
+        %g  (numeric) real GID of dumped process
+        %h  hostname (same as nodename returned by uname(2))
+        %i  TID of thread that triggered core dump, as seen in the PID namespace in which the thread resides (since Linux 3.18)
+        %I  TID of thread that triggered core dump, as seen in the initial PID namespace (since Linux 3.18)
+        %p  PID of dumped process, as seen in the PID namespace in which the process resides
+        %P  PID of dumped process, as seen in the initial PID namespace (since Linux 3.12)
+        %s  number of signal causing dump
+        %t  time of dump, expressed as seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)
+        %u  (numeric) real UID of dumped process
+        """
+        replace = {
+            '%%': '%',
+            '%e': self.basename,
+            '%E': self.exe.replace('/', '!'),
+            '%g': str(self.gid),
+            '%h': socket.gethostname(),
+            '%i': str(self.pid),
+            '%I': str(self.pid),
+            '%p': str(self.pid),
+            '%P': str(self.pid),
+            '%s': str(-process.poll()),
+            '%u': str(self.uid)
+        }
+        replace = dict((re.escape(k), v) for k, v in replace.iteritems())
+        pattern = re.compile("|".join(replace.keys()))
+        corefile_path = pattern.sub(lambda m: replace[re.escape(m.group(0))], core_pattern)
+
+        if self.kernel_core_uses_pid:
+            corefile_path += '.%i' % self.pid
+
+        if os.pathsep not in corefile_path:
+            corefile_path = os.path.join(self.cwd, corefile_path)
+
+        if os.path.exists(corefile_path):
+            return corefile_path
+
+    def qemu_corefile(self):
+        """qemu_corefile() -> str
+
+        Retrieves the path to a QEMU core dump.
+        """
+
+        # QEMU doesn't follow anybody else's rules
+        # https://github.com/qemu/qemu/blob/stable-2.6/linux-user/elfload.c#L2710-L2744
+        #
+        #     qemu_<basename-of-target-binary>_<date>-<time>_<pid>.core
+        #
+        # Note that we don't give any fucks about the date and time, since the PID
+        # should be unique enough that we can just glob.
+        corefile_name = 'qemu_{basename}_*_{pid}.core'
+
+        # Format the name
+        corefile_name = corefile_name.format(basename=self.basename,
+                                             pid=self.pid)
+
+        # Get the full path
+        corefile_path = os.path.join(self.cwd, corefile_name)
+
+        # Glob all of them, return the *most recent* based on numeric sort order.
+        for corefile in sorted(glob.glob(corefile_path), reverse=True):
+            return corefile
+
+    def _load_core_expect_pid(path, pid):
+        pass
+
+    def _rename_apport_corefile():
+        pass
+
+    def _extract_apport_coredump(path):
+        with open(path, 'rt') as file:
+            # Find the CoreDump
+            for line in file:
+                if line.startswith('CoreDump: base64'):
+                    break
+            else:
+                return
+
+            # Get all of the base64'd lines
+            chunks = []
+            for line in file:
+                if not line.startswith(' '):
+                    break
+                chunks.append(b64d(line))
+
+            # Smush everything together, then extract it
+            compressed_data = ''.join(chunks)
+            compressed_file = StringIO.StringIO(compressed_data)
+            gzip_file = gzip.GzipFile(fileobj=compressed_file)
+            core_data = gzip_file.read()
+
+            # Create a temporary file
+            tmp = tempfile.mktemp(prefix='pwn-core-')
+
+            with open(tmp, 'wb+') as file:
+                file.write(core_data)
+
+            return tmp

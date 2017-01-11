@@ -288,7 +288,13 @@ class ssh_channel(sock):
         self.error("Cannot use spawn_process on an SSH channel.""")
 
     def _close_msg(self):
-        self.info('Closed SSH channel with %s' % self.host)
+        if not self.executable:
+            self.info('Closed SSH channel with %s' % self.host)
+        else:
+            self.info('Stopped remote process %r on %s (pid %i)' \
+                        % (os.path.basename(self.executable),
+                           self.host,
+                           self.pid))
 
     def getenv(self, variable, **kwargs):
         """Retrieve the address of an environment variable in the remote process.
@@ -519,6 +525,8 @@ class ssh(Timeout, Logger):
 
         # Deferred attributes
         self._platform_info = {}
+        self._aslr = None
+        self._aslr_ulimit = None
 
         misc.mkdir_p(self._cachedir)
 
@@ -823,11 +831,11 @@ class ssh(Timeout, Logger):
             self.error("preexec_fn cannot be a lambda")
 
         func_src  = inspect.getsource(func).strip()
-        setuid = setuid if setuid is None else bool(setuid)
+        setuid = True if setuid is None else bool(setuid)
 
         script = r"""
 #!/usr/bin/env python2
-import os, sys, ctypes, resource, platform
+import os, sys, ctypes, resource, platform, stat
 from collections import OrderedDict
 exe   = %(executable)r
 argv  = %(argv)r
@@ -856,7 +864,7 @@ if not is_exe(exe):
     sys.stderr.write("{} is not executable or does not exist in $PATH: {}".format(exe,PATH))
     sys.exit(-1)
 
-if %(setuid)r is False:
+if not %(setuid)r:
     PR_SET_NO_NEW_PRIVS = 38
     result = ctypes.CDLL('libc.so.6').prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)
 
@@ -872,10 +880,25 @@ try:
 except Exception:
     pass
 
+# Determine what UID the process will execute as
+# This is used for locating apport core dumps
+suid = os.getuid()
+sgid = os.getgid()
+st = os.stat(exe)
+if %(setuid)r:
+    if (st.st_mode & stat.S_ISUID):
+        suid = st.st_uid
+    if (st.st_mode & stat.S_ISGID):
+        sgid = st.st_gid
+
 if sys.argv[-1] == 'check':
     sys.stdout.write("1\n")
     sys.stdout.write(str(os.getpid()) + "\n")
-    sys.stdout.write(exe + '\x00')
+    sys.stdout.write(str(os.getuid()) + "\n")
+    sys.stdout.write(str(os.getgid()) + "\n")
+    sys.stdout.write(str(suid) + "\n")
+    sys.stdout.write(str(sgid) + "\n")
+    sys.stdout.write(os.path.realpath(exe) + '\x00')
     sys.stdout.flush()
 
 for fd, newfd in {0: %(stdin)r, 1: %(stdout)r, 2:%(stderr)r}.items():
@@ -926,25 +949,33 @@ os.execve(exe, argv, os.environ)
             self.upload_data(script, tmpfile)
             return tmpfile
 
-        execve_repr = "execve(%r, %s, %s)" % (executable,
-                                              argv,
-                                              'os.environ'
-                                              if (env in (None, os.environ))
-                                              else env)
+        if self.isEnabledFor(logging.DEBUG):
+            execve_repr = "execve(%r, %s, %s)" % (executable,
+                                                  argv,
+                                                  'os.environ'
+                                                  if (env in (None, os.environ))
+                                                  else env)
+            # Avoid spamming the screen
+            if self.isEnabledFor(logging.DEBUG) and len(execve_repr) > 512:
+                execve_repr = execve_repr[:512] + '...'
+        else:
+            execve_repr = repr(executable)
 
-        # Avoid spamming the screen
-        if context.log_level >= logging.INFO and len(execve_repr) > 512:
-            execve_repr = execve_repr[:512] + '...'
+        msg = 'Starting remote process %s on %s' % (execve_repr, self.host)
 
-        with self.progress('Opening new channel: %s' % execve_repr) as h:
-
-            if not aslr:
-                self.warn_once("ASLR is disabled!")
+        with self.progress(msg) as h:
 
             script = sh_string.sh_command_with('for py in python2.7 python2 python; do test -x "$(which $py 2>&1)" && exec $py -c %s check; done; echo 2', script)
             with context.local(log_level='error'):
                 python = self.run(script, raw=raw)
-            result = safeeval.const(python.recvline())
+
+            try:
+                result = safeeval.const(python.recvline())
+            except Exception:
+                h.failure("Process creation failed")
+                self.warn_once('Could not find a Python2 interpreter on %s\n' % self.host \
+                               + "Use ssh.run() instead of ssh.process()")
+                return None
 
             # If an error occurred, try to grab as much output
             # as we can.
@@ -961,8 +992,27 @@ os.execve(exe, argv, os.environ)
                 h.failure("something bad happened:\n%s" % error_message)
 
             python.pid  = safeeval.const(python.recvline())
+            python.uid  = safeeval.const(python.recvline())
+            python.gid  = safeeval.const(python.recvline())
+            python.suid = safeeval.const(python.recvline())
+            python.sgid = safeeval.const(python.recvline())
             python.argv = argv
             python.executable = python.recvuntil('\x00')[:-1]
+
+            h.success('pid %i' % python.pid)
+
+        if aslr == False and setuid and (python.uid != python.suid or python.gid != python.sgid):
+            effect = "partial" if self.aslr_ulimit else "no"
+            message = "Specfied aslr=False on setuid binary %s\n" % python.executable
+            message += "This will have %s effect.  Add setuid=False to disable ASLR for debugging.\n" % effect
+
+            if self.aslr_ulimit:
+                message += "Unlimited stack size should de-randomize shared libraries."
+
+            self.warn_once(message)
+
+        elif not aslr:
+            self.warn_once("ASLR is disabled for %r!" % python.executable)
 
         return python
 
@@ -1511,6 +1561,15 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
                     self.error("Could not untar %r on the remote end\n%s" % (remote_tar, message))
 
     def upload(self, file_or_directory, remote=None):
+        """upload(file_or_directory, remote=None)
+
+        Upload a file or directory to the remote host.
+
+        Arguments:
+            file_or_directory(str): Path to the file or directory to download.
+            remote(str): Local path to store the data.
+                By default, uses the working directory.
+        """
         if isinstance(file_or_directory, str):
             file_or_directory = os.path.expanduser(file_or_directory)
             file_or_directory = os.path.expandvars(file_or_directory)
@@ -1524,17 +1583,39 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         self.error('%r does not exist' % file_or_directory)
 
 
-    def download(self, file_or_directory, remote=None):
+    def download(self, file_or_directory, local=None):
+        """download(file_or_directory, local=None)
+
+        Download a file or directory from the remote host.
+
+        Arguments:
+            file_or_directory(str): Path to the file or directory to download.
+            local(str): Local path to store the data.
+                By default, uses the current directory.
+        """
         if not self.sftp:
             self.error("Cannot determine remote file type without SFTP")
 
         if 0 == self.system(sh_string.sh_command_with('test -d %s', file_or_directory)).wait():
-            self.download_dir(file_or_directory, remote)
+            self.download_dir(file_or_directory, local)
         else:
-            self.download_file(file_or_directory, remote)
+            self.download_file(file_or_directory, local)
 
     put = upload
     get = download
+
+    def unlink(self, file):
+        """unlink(file)
+
+        Delete the file on the remote host
+
+        Arguments:
+            file(str): Path to the file
+        """
+        if not self.sftp:
+            self.error("unlink() is only supported if SFTP is supported")
+
+        return self.sftp.unlink(file)
 
     def libs(self, remote, directory = None):
         """Downloads the libraries referred to by a file.
@@ -1785,17 +1866,18 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
     @property
     def aslr(self):
         """:class:`bool`: Whether ASLR is enabled on the system."""
-        if self.os != 'linux':
-            self.warn_once("Only Linux is supported for ASLR checks.")
-            return False
+        if self._aslr is None:
+            if self.os != 'linux':
+                self.warn_once("Only Linux is supported for ASLR checks.")
+                self._aslr = False
 
-        with context.quiet:
-            rvs = self.read('/proc/sys/kernel/randomize_va_space')
+            else:
+                with context.quiet:
+                    rvs = self.read('/proc/sys/kernel/randomize_va_space')
 
-        if rvs.startswith('0'):
-            return False
+                self._aslr = not rvs.startswith('0')
 
-        return True
+        return self._aslr
 
     @property
     def aslr_ulimit(self):
@@ -1803,25 +1885,35 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         import pwnlib.elf.elf
         import pwnlib.shellcraft
 
+        if self._aslr_ulimit is not None:
+            return self._aslr_ulimit
+
         # This test must run a 32-bit binary, fix the architecture
         arch = {
             'amd64': 'i386',
             'aarch64': 'arm'
         }.get(self.arch, self.arch)
 
-        with context.local(arch=arch, bits=32, os=self.os, aslr=False):
+        with context.local(arch=arch, bits=32, os=self.os, aslr=True):
             with context.quiet:
                 sc = pwnlib.shellcraft.cat('/proc/self/maps') \
                    + pwnlib.shellcraft.exit(0)
 
                 elf = pwnlib.elf.elf.ELF.from_assembly(sc, shared=True)
 
+                def preexec():
+                    import resource
+                    try:
+                        resource.setrlimit(resource.RLIMIT_STACK, (-1, -1))
+                    except Exception:
+                        pass
+
                 # Move to a new temporary directory
                 cwd = self.cwd
                 tmp = self.set_working_directory()
                 self.upload(elf.path, './aslr-test')
                 self.process(['chmod', '+x', './aslr-test']).wait()
-                maps = self.process(['./aslr-test']).recvall()
+                maps = self.process(['./aslr-test'], preexec_fn=preexec).recvall()
 
                 # Move back to the old directory
                 self.cwd = cwd
@@ -1832,9 +1924,12 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         # Check for 555555000 (1/3 of the address space for PAE)
         # and for 40000000 (1/3 of the address space with 3BG barrier)
         if '55555000' in maps or '40000000' in maps:
-            return True
+            self._aslr_ulimit = True
 
-        return False
+        else:
+            self._aslr_ulimit = False
+
+        return self._aslr_ulimit
 
     def checksec(self, banner=True):
         """checksec()

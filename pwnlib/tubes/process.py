@@ -12,6 +12,7 @@ import resource
 import select
 import signal
 import subprocess
+import time
 import tty
 
 from pwnlib.context import context
@@ -20,6 +21,7 @@ from pwnlib.qemu import get_qemu_user
 from pwnlib.timeout import Timeout
 from pwnlib.tubes.tube import tube
 from pwnlib.util.misc import parse_ldd_output
+from pwnlib.util.misc import read
 from pwnlib.util.misc import which
 
 log = getLogger(__name__)
@@ -203,8 +205,8 @@ class process(tube):
     PIPE = PIPE
     PTY = PTY
 
-    #: Have we seen the process stop?
-    _stop_noticed = False
+    #: Have we seen the process stop?  If so, this is a unix timestamp.
+    _stop_noticed = 0
 
     def __init__(self, argv = None,
                  shell = False,
@@ -322,6 +324,8 @@ class process(tube):
                         raise
                     prefixes.append(self.__on_enoexec(exception))
 
+            p.success('pid %i' % self.pid)
+
         if self.pty is not None:
             if stdin is slave:
                 self.proc.stdin = os.fdopen(os.dup(master), 'r+')
@@ -338,6 +342,19 @@ class process(tube):
         fd = self.proc.stdout.fileno()
         fl = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+        # Save off information about whether the binary is setuid / setgid
+        self.uid = os.getuid()
+        self.gid = os.getgid()
+        self.suid = -1
+        self.sgid = -1
+        st = os.stat(self.executable)
+        if self._setuid:
+            if (st.st_mode & stat.S_ISUID):
+                self.setuid = st.st_uid
+            if (st.st_mode & stat.S_ISGID):
+                self.setgid = st.st_gid
+
 
     def __preexec_fn(self):
         """
@@ -624,14 +641,15 @@ class process(tube):
         returncode = self.proc.returncode
 
         if returncode != None and not self._stop_noticed:
-            self._stop_noticed = True
+            self._stop_noticed = time.time()
             signame = ''
             if returncode < 0:
                 signame = ' (%s)' % (signal_names.get(returncode, 'SIG???'))
 
-            self.info("Process %r stopped with exit code %d%s" % (self.display,
+            self.info("Process %r stopped with exit code %d%s (pid %i)" % (self.display,
                                                                   returncode,
-                                                                  signame))
+                                                                  signame,
+                                                                  self.pid))
         return returncode
 
     def communicate(self, stdin = None):
@@ -732,15 +750,15 @@ class process(tube):
             try:
                 self.proc.kill()
                 self.proc.wait()
-                self._stop_noticed = True
-                self.info('Stopped program %r' % self.program)
+                self._stop_noticed = time.time()
+                self.info('Stopped process %r (pid %i)' % (self.program, self.pid))
             except OSError:
                 pass
 
 
     def fileno(self):
         if not self.connected():
-            self.error("A stopped program does not have a file number")
+            self.error("A stopped process does not have a file number")
 
         return self.proc.stdout.fileno()
 
