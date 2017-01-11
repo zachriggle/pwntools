@@ -870,6 +870,11 @@ class process(tube):
 
         Returns a corefile for the process.
 
+        If the process is alive, attempts to create a coredump with GDB.
+
+        If the process is dead, attempts to locate the coredump created
+        by the kernel.
+
         Example:
 
             >>> proc = process('bash')

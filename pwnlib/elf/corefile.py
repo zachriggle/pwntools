@@ -313,11 +313,10 @@ class Corefile(ELF):
         >>> io.poll(block=True) == -signal.SIGSEGV
         True
 
-        There is a useful helper utility to find the core file for a crashed
-        process.  You can specify a full path a la ``Corefile('/path/to/core')``,
-        though generally the helper will be the most useful.
+        You can specify a full path a la ``Corefile('/path/to/core')``,
+        but you can also just access the :attr:`.process.corefile` attribute.
 
-        >>> core = Corefile.find_core(io)
+        >>> core = io.corefile
 
         The core file has a :attr:`.Corefile.exe` property, which is a :class:`.Mapping`
         object.  Each mapping can be accessed with virtual addresses via subscript, or
