@@ -815,6 +815,9 @@ class ROP(object):
         """Returns: Raw bytes of the ROP chain"""
         return self.chain()
 
+    def __flat__(self):
+        return self.chain()
+
     def __get_cachefile_name(self, elf):
         basename = os.path.basename(elf.file.name)
         sha256 = hashlib.sha256(elf.get_data()).hexdigest()
