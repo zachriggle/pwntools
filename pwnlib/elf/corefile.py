@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Read information from Core Dumps.
 
 Core dumps are extremely useful when writing exploits, even outside of
