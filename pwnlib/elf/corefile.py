@@ -610,7 +610,7 @@ class Corefile(ELF):
 
     @staticmethod
     def _load_core_expect_pid(path, pid):
-        corefile = Corefile(corefile_path)
+        corefile = Corefile(path)
         if corefile.pid != process.pid:
             log.warn("Core file PIDs do not match! Expected %i, got %i" \
                     % (process.pid, corefile.pid))
