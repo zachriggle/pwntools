@@ -275,8 +275,7 @@ class process(tube):
         #: Environment passed on envp
         self.env = os.environ if env is None else env
 
-        #: Directory the process was created in
-        self.cwd          = cwd or os.path.curdir
+        self._cwd = os.path.realpath(cwd or os.path.curdir)
 
         #: Alarm timeout of the process
         self.alarm        = alarm
@@ -427,6 +426,17 @@ class process(tube):
         """Alias for ``executable``, for backward compatibility"""
         return self.executable
 
+    @property
+    def cwd(self):
+        """Directory that the process is working in."""
+        try:
+            self._cwd = os.readlink('/proc/%i/cwd' % self.pid)
+        except Exception:
+            pass
+
+        return self._cwd
+
+
     def _validate(self, cwd, executable, argv, env):
         """
         Perform extended validation on the executable path, argv, and envp.
@@ -572,6 +582,11 @@ class process(tube):
         Poll the exit code of the process. Will return None, if the
         process has not yet finished and the exit code otherwise.
         """
+
+        # In order to facilitate retrieving core files, force an update
+        # to the current working directory
+        _ = self.cwd
+
         if block:
             self.wait_for_close()
 

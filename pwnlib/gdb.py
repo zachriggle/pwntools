@@ -352,10 +352,6 @@ def debug(args, gdbscript=None, exe=None, ssh=None, env=None, **kwargs):
             continue
             ''')
     """
-    if context.noptrace:
-        log.warn_once("Skipping debugger since context.noptrace==True")
-        return tubes.process.process(args, executable=exe, env=env)
-
     if isinstance(args, (int, tubes.process.process, tubes.ssh.ssh_channel)):
         log.error("Use gdb.attach() to debug a running process")
 
@@ -369,6 +365,10 @@ def debug(args, gdbscript=None, exe=None, ssh=None, env=None, **kwargs):
 
     runner = _get_runner(ssh)
     which  = _get_which(ssh)
+
+    if context.noptrace:
+        log.warn_once("Skipping debugger since context.noptrace==True")
+        return runner(args, executable=exe, env=env)
 
     if ssh or context.native or (context.os == 'android'):
         args = _gdbserver_args(args=args, which=which)

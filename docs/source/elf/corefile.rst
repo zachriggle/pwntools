@@ -13,3 +13,8 @@
 
   .. autoclass:: pwnlib.elf.corefile.Mapping
      :members:
+
+  .. autoclass:: pwnlib.elf.corefile.Coredump
+
+  .. autoclass:: pwnlib.elf.corefile.Core
+

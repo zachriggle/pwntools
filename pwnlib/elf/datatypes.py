@@ -550,3 +550,41 @@ class Elf32_auxv_t(ctypes.Structure):
 class Elf64_auxv_t(ctypes.Structure):
     _fields_ = [('a_type', ctypes.c_uint64),
                 ('a_val', ctypes.c_uint64),]
+
+def generate_prspinfo(long):
+    return [
+        ('pr_state', byte),
+        ('pr_sname', char),
+        ('pr_zomb', byte),
+        ('pr_nice', byte),
+        ('pr_flag', long),
+        ('pr_uid', ctypes.c_ushort),
+        ('pr_gid', ctypes.c_ushort),
+        ('pr_pid', ctypes.c_int),
+        ('pr_ppid', ctypes.c_int),
+        ('pr_pgrp', ctypes.c_int),
+        ('pr_sid', ctypes.c_int),
+        ('pr_fname', char * 16),
+        ('pr_psargs', char * 80)
+    ]
+
+class elf_prspinfo_32(ctypes.Structure):
+    _fields_ = generate_prspinfo(Elf32_Addr)
+
+class elf_prspinfo_64(ctypes.Structure):
+    _fields_ = generate_prspinfo(Elf64_Addr)
+
+def generate_siginfo(int, long):
+    class siginfo_t(ctypes.Structure):
+        _fields_ = [('si_signo', int),
+                    ('si_errno', int),
+                    ('si_code', int),
+                    ('sigfault_addr', long),
+                    ('sigfault_trapno', int)]
+    return siginfo_t
+
+class elf_siginfo_32(generate_siginfo(ctypes.c_uint32, ctypes.c_uint32)):
+    pass
+
+class elf_siginfo_64(generate_siginfo(ctypes.c_uint32, ctypes.c_uint64)):
+    pass

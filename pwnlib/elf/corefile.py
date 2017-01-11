@@ -63,6 +63,9 @@ from __future__ import absolute_import
 
 import collections
 import ctypes
+import re
+import os
+import socket
 
 import elftools
 from elftools.common.py3compat import bytes2str
@@ -74,15 +77,27 @@ from pwnlib.context import context
 from pwnlib.elf.datatypes import *
 from pwnlib.elf.elf import ELF
 from pwnlib.log import getLogger
+from pwnlib.tubes.process import process
 from pwnlib.tubes.tube import tube
+from pwnlib.util.misc import read
 from pwnlib.util.packing import pack
 from pwnlib.util.packing import unpack_many
 
 log = getLogger(__name__)
 
-types = {
+prstatus_types = {
     'i386': elf_prstatus_i386,
     'amd64': elf_prstatus_amd64,
+}
+
+prspinfo_types = {
+    32: elf_prspinfo_32,
+    64: elf_prspinfo_64,
+}
+
+siginfo_types = {
+    32: elf_siginfo_32,
+    64: elf_siginfo_64
 }
 
 # Slightly modified copy of the pyelftools version of the same function,
@@ -225,6 +240,10 @@ class Corefile(ELF):
     Registers can be accessed directly, e.g. via ``core_obj.eax`` and enumerated
     via :data:`Corefile.registers`.
 
+    Arguments:
+        core: Path to the core file.  Alternately, may be a :class:`.process` instance,
+              and the core file will be located automatically.
+
     ::
 
         >>> c = Corefile('./core')
@@ -317,6 +336,15 @@ class Corefile(ELF):
         >>> core.eax == 0xdeadbeef
         True
 
+        We may not always know which signal caused the core dump, or what address
+        caused a segmentation fault.  Instead of accessing registers directly, we
+        can also extract this information from the core dump.
+
+        >>> core.fault_addr == 0xcafebabe
+        True
+        >>> core.signal == signal.SIGSEGV
+        True
+
         Various other mappings are available by name.  On Linux, 32-bit binaries
         should have a VDSO section.  Since our ELF is statically linked, there is
         no libc which gets mapped.
@@ -353,6 +381,9 @@ class Corefile(ELF):
         #: The NT_PRSTATUS object.
         self.prstatus = None
 
+        #: The NT_PRSPINFO object
+        self.prspinfo = None
+
         #: :class:`dict`: Dictionary of memory mappings from ``address`` to ``name``
         self.mappings = []
 
@@ -373,7 +404,7 @@ class Corefile(ELF):
         self.argc = 0
 
         try:
-            super(Core, self).__init__(*a, **kw)
+            super(Corefile, self).__init__(*a, **kw)
         except IOError:
             log.warning("No corefile.  Have you set /proc/sys/kernel/core_pattern?")
             raise
@@ -387,7 +418,9 @@ class Corefile(ELF):
         if not self.arch in ('i386','amd64'):
             log.error("%s does not use a supported corefile architecture" % e.file.name)
 
-        prstatus_type = types[self.arch]
+        prstatus_type = prstatus_types[self.arch]
+        prspinfo_type = prspinfo_types[self.bits]
+        siginfo_type = siginfo_types[self.bits]
 
         with log.waitfor("Parsing corefile...") as w:
             self._load_mappings()
@@ -402,6 +435,19 @@ class Corefile(ELF):
                        note.n_type == 'NT_GNU_ABI_TAG':
                         self.NT_PRSTATUS = note
                         self.prstatus = prstatus_type.from_buffer_copy(note.n_desc)
+
+                    # Try to find NT_PRPSINFO
+                    # Note that pyelftools currently mis-identifies the enum name
+                    # as 'NT_GNU_BUILD_ID'
+                    if note.n_descsz == ctypes.sizeof(prspinfo_type) and \
+                      note.n_type == 'NT_GNU_BUILD_ID':
+                        self.NT_PRSPINFO = note
+                        self.prspinfo = prspinfo_type.from_buffer_copy(note.n_desc)
+
+                    # Try to find NT_SIGINFO so we can see the fault
+                    if note.n_type == 0x53494749:
+                        self.NT_SIGINFO = note
+                        self.siginfo = siginfo_type.from_buffer_copy(note.n_desc)
 
                     # Try to find the list of mapped files
                     if note.n_type == constants.NT_FILE:
@@ -427,6 +473,87 @@ class Corefile(ELF):
                     # If there are no environment variables, we die by running
                     # off the end of the stack.
                     pass
+
+    @staticmethod
+    def find_corefile(process):
+        """find_corefile(process) -> Corefile
+
+        Locate a corefile on disk for the specified process.
+
+        Arguments:
+            process(process): Process instance that we want to find a corefile for.
+
+        Returns:
+            :class:`.Corefile`
+
+        Note:
+            This can only find core files that were created by the kernel, when
+            the process crashed.  To generate a corefile of a *running* process,
+            use :meth:`.process.corefile` or :func:`.gdb.corefile`.
+        """
+        if not process.poll():
+            log.error("Process %i has not exited" % (process.pid))
+
+        core_pattern = read('/proc/sys/kernel/core_pattern')
+        core_uses_pid = bool(read('/proc/sys/kernel/core_uses_pid'))
+
+        # From man core(5):
+        # For backward compatibility, if /proc/sys/kernel/core_pattern
+        # does not include %p and /proc/sys/kernel/core_uses_pid (see  below)
+        # is nonzero, then .PID will be appended to the core filename.
+        if '%p' in core_pattern:
+            core_uses_pid = False
+
+        # If there's a pipe program, who knows what can happen.
+        if core_pattern.startswith('|'):
+            log.warn_once("May not be able to locate core dumps, core_pattern is: %r" % core_pattern)
+            corefile_path = 'core'
+
+        else:
+            """
+            %%  a single % character
+            %c  core file size soft resource limit of crashing process (since Linux 2.6.24)
+            %d  dump mode—same as value returned by prctl(2) PR_GET_DUMPABLE (since Linux 3.7)
+            %e  executable filename (without path prefix)
+            %E  pathname of executable, with slashes ('/') replaced by exclamation marks ('!') (since Linux 3.0).
+            %g  (numeric) real GID of dumped process
+            %h  hostname (same as nodename returned by uname(2))
+            %i  TID of thread that triggered core dump, as seen in the PID namespace in which the thread resides (since Linux 3.18)
+            %I  TID of thread that triggered core dump, as seen in the initial PID namespace (since Linux 3.18)
+            %p  PID of dumped process, as seen in the PID namespace in which the process resides
+            %P  PID of dumped process, as seen in the initial PID namespace (since Linux 3.12)
+            %s  number of signal causing dump
+            %t  time of dump, expressed as seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)
+            %u  (numeric) real UID of dumped process
+            """
+            replace = {
+                '%%': '%',
+                '%e': os.path.basename(process.executable),
+                '%E': process.executable_segments.replace('/', '!'),
+                '%g': os.getgid(),
+                '%h': socket.gethostname(),
+                '%i': process.pid,
+                '%I': process.pid,
+                '%p': process.pid,
+                '%P': process.pid,
+                '%s': -process.poll(),
+                '%u': os.getuid()
+            }
+            rep = dict((re.escape(k), v) for k, v in rep.iteritems())
+            pattern = re.compile("|".join(rep.keys()))
+            corefile_path = pattern.sub(lambda m: rep[re.escape(m.group(0))], core_pattern)
+
+        # If core_pattern does not specify an absolute path, it will be relative to
+        # the directory that the process was executing in.  We cannot know for sure what
+        # that was, but we can know what it was initially.  Best effort.
+        if os.pathsep not in corefile_path:
+            corefile_path = os.path.join(process.cwd, corefile_path)
+
+        # Check to see whether we should append .PID
+        if core_uses_pid:
+            corefile_path += '.%i' % process.pid
+
+        return corefile.path
 
     def _parse_nt_file(self, note):
         t = tube()
@@ -511,6 +638,33 @@ class Corefile(ELF):
         for m in self.mappings:
             if self.at_entry and m.start <= self.at_entry <= m.stop:
                 return m
+
+    @property
+    def pid(self):
+        """:class:`int`: PID of the process which created the core dump."""
+        if self.prstatus:
+            return int(self.prstatus.pr_pid)
+
+    @property
+    def ppid(self):
+        """:class:`int`: Parent PID of the process which created the core dump."""
+        if self.prstatus:
+            return int(self.prstatus.pr_ppid)
+
+    @property
+    def signal(self):
+        """:class:`int`: Signal which caused the core to be dumped."""
+        if self.siginfo:
+            return int(self.siginfo.si_signo)
+        if self.prstatus:
+            return int(self.prstatus.pr_cursig)
+
+    @property
+    def fault_addr(self):
+        """:class:`int`: Address which generated the fault, for the signals
+            SIGILL, SIGFPE, SIGSEGV, SIGBUS."""
+        if self.siginfo:
+            return int(self.siginfo.sigfault_addr)
 
     def _load_mappings(self):
         for s in self.segments:
@@ -668,6 +822,9 @@ class Corefile(ELF):
     @property
     def registers(self):
         """:class:`dict`: All available registers in the coredump."""
+        if not self.prstatus:
+            return {}
+
         rv = {}
 
         for k in dir(self.prstatus.pr_reg):
@@ -691,4 +848,9 @@ class Corefile(ELF):
 
         return super(Core, self).__getattribute__(attribute)
 
-Core = Corefile
+
+class Core(Corefile):
+    """Alias for :class:`.Corefile`"""
+
+class Coredump(Corefile):
+    """Alias for :class:`.Corefile`"""
