@@ -495,8 +495,8 @@ class Corefile(ELF):
         if not process.poll():
             log.error("Process %i has not exited" % (process.pid))
 
-        core_pattern = read('/proc/sys/kernel/core_pattern')
-        core_uses_pid = bool(read('/proc/sys/kernel/core_uses_pid'))
+        core_pattern = read('/proc/sys/kernel/core_pattern').strip()
+        core_uses_pid = bool(int(read('/proc/sys/kernel/core_uses_pid')))
 
         # From man core(5):
         # For backward compatibility, if /proc/sys/kernel/core_pattern
@@ -554,7 +554,39 @@ class Corefile(ELF):
         if core_uses_pid:
             corefile_path += '.%i' % process.pid
 
-        return corefile_path
+        # Did we get lucky?
+        if True or not os.path.exists(corefile_path):
+            log.warn("Could not find corefile for PID %i, taking a guess!" % process.pid)
+
+            guesses = [
+                '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), process.pid),
+                'core.%i' % process.pid,
+                'core'
+            ]
+
+            for guess in guesses:
+                if not os.path.isfile(guess):
+                    continue
+
+                # We may open a bunch of the wrong core file...
+                # Don't spam the user with messages.
+                with context.silent:
+                    core = Corefile(guess)
+
+                    if core.pid == process.pid:
+                        break
+
+            else:
+                log.error("Could not find core file for PID %i" % (process.pid))
+
+
+        corefile = Corefile(corefile_path)
+
+        if corefile.pid != process.pid:
+            log.warn("Core file PIDs do not match! Expected %i, got %i" \
+                    % (process.pid, corefile.pid))
+
+        return corefile
 
     def _parse_nt_file(self, note):
         t = tube()
