@@ -565,12 +565,12 @@ class Corefile(ELF):
             crash_path = '/var/crash/%s.%i.crash' % (process.executable.replace('/', '_'), os.getuid())
 
             if os.path.isfile(crash_path):
-                corefile_path = Corefile._extract_apport_coredump(apport_path)
+                corefile_path = Corefile._extract_apport_coredump(crash_path)
 
                 if corefile_path:
                     # Apport won't write new crashes as long as the old one exists
                     # so unlink it.
-                    os.unlink(apport_path)
+                    os.unlink(crash_path)
 
                     # Move the extracted corefile to a persistent location so that
                     # the user can access it persistently.
