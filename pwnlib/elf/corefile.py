@@ -540,9 +540,9 @@ class Corefile(ELF):
                 '%s': -process.poll(),
                 '%u': os.getuid()
             }
-            rep = dict((re.escape(k), v) for k, v in rep.iteritems())
-            pattern = re.compile("|".join(rep.keys()))
-            corefile_path = pattern.sub(lambda m: rep[re.escape(m.group(0))], core_pattern)
+            replace = dict((re.escape(k), v) for k, v in replace.iteritems())
+            pattern = re.compile("|".join(replace.keys()))
+            corefile_path = pattern.sub(lambda m: replace[re.escape(m.group(0))], core_pattern)
 
         # If core_pattern does not specify an absolute path, it will be relative to
         # the directory that the process was executing in.  We cannot know for sure what
