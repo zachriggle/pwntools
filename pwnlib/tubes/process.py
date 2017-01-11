@@ -424,12 +424,38 @@ class process(tube):
 
     @property
     def program(self):
-        """Alias for ``executable``, for backward compatibility"""
+        """Alias for ``executable``, for backward compatibility.
+
+        Example:
+
+            >>> p = process('true')
+            >>> p.executable == '/bin/true'
+            True
+            >>> p.executable == p.program
+            True
+
+        """
         return self.executable
 
     @property
     def cwd(self):
-        """Directory that the process is working in."""
+        """Directory that the process is working in.
+
+        Example:
+
+            >>> p = process('sh')
+            >>> p.sendline('cd /tmp; echo AAA')
+            >>> _ = p.recvuntil('AAA')
+            >>> p.cwd == '/tmp'
+            True
+            >>> p.sendline('cd /proc; echo BBB; exit 7')
+            >>> _ = p.recvuntil('BBB')
+            >>> p.close()
+            >>> p.poll(True) == 7
+            True
+            >>> p.cwd == '/proc'
+            True
+        """
         try:
             self._cwd = os.readlink('/proc/%i/cwd' % self.pid)
         except Exception:
