@@ -649,6 +649,9 @@ class Corefile(ELF):
         # Get a copy of the stack mapping
         stack = self.stack
 
+        if not stack:
+            return
+
         # AT_EXECFN is the start of the filename, e.g. '/bin/sh'
         # Immediately preceding is a NULL-terminated environment variable string.
         # We want to find the beginning of it
