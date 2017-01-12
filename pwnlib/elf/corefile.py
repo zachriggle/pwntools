@@ -489,8 +489,6 @@ class Corefile(ELF):
                             self._parse_auxv(note)
 
             if not self.stack and self.mappings:
-                for mapping in mappings[::-1]:
-                    if mapping[-]
                 self.stack = self.mappings[-1]
 
             if self.stack and self.mappings:
