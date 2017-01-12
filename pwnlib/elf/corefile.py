@@ -948,8 +948,9 @@ class CorefileFinder(object):
                 f.write(apport_core)
             return filename
 
+        # Pretend core_pattern was just 'core', and see if we come up with anything
         self.kernel_core_pattern = 'core'
-        return native_corefile_pattern()
+        return self.native_corefile_pattern()
 
     def native_corefile_pattern(self):
         """
