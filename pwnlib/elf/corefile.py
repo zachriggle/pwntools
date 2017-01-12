@@ -794,7 +794,6 @@ class CorefileFinder(object):
         self.exe = proc.executable
         self.basename = os.path.basename(self.exe)
         self.cwd = proc.cwd
-        self.interpreter = self.binfmt_lookup()
 
         # XXX: Should probably break out all of this logic into
         #      its own class, so that we can support "file ops"
@@ -808,6 +807,8 @@ class CorefileFinder(object):
 
         self.kernel_core_pattern = self.read('/proc/sys/kernel/core_pattern').strip()
         self.kernel_core_uses_pid = bool(int(self.read('/proc/sys/kernel/core_uses_pid')))
+
+        self.interpreter = self.binfmt_lookup()
 
         if self.interpreter and self.interpreter.contains('qemu-'):
             self.core_path = self.qemu_corefile()
