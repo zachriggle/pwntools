@@ -794,7 +794,7 @@ class CorefileFinder(object):
         self.exe = proc.executable
         self.basename = os.path.basename(self.exe)
         self.cwd = proc.cwd
-        self.qemu = getattr(proc, '__qemu', False)
+        self.interpreter = self.binfmt_lookup()
 
         # XXX: Should probably break out all of this logic into
         #      its own class, so that we can support "file ops"
@@ -809,7 +809,7 @@ class CorefileFinder(object):
         self.kernel_core_pattern = self.read('/proc/sys/kernel/core_pattern').strip()
         self.kernel_core_uses_pid = bool(int(self.read('/proc/sys/kernel/core_uses_pid')))
 
-        if self.qemu:
+        if self.interpreter and self.interpreter.contains('qemu-'):
             self.core_path = self.qemu_corefile()
         else:
             self.core_path = self.native_corefile()
@@ -1021,3 +1021,36 @@ class CorefileFinder(object):
         # Glob all of them, return the *most recent* based on numeric sort order.
         for corefile in sorted(glob.glob(corefile_path), reverse=True):
             return corefile
+
+    def binfmt_lookup(self):
+        """Parses /proc/sys/fs/binfmt_misc to find the interpreter for a file"""
+        if not isinstance(self.process, process):
+            return
+
+        if not os.path.isdir('/proc/sys/fs/binfmt_misc'):
+            return
+
+        data = self.read(self.exe)
+
+        for entry in os.listdir('/proc/sys/fs/binfmt_misc'):
+            keys = {}
+
+            for line in self.read(entry):
+                k,v = line.split(None, 1)
+                keys[k] = v
+
+            if not keys['magic']:
+                continue
+
+            magic = bytearray(unhex(keys['magic']))
+            mask  = bytearray('\xff' * len(magic))
+
+            if keys['mask']:
+                mask = bytearray(unhex(keys['mask']))
+
+            for i in range(len(magic)):
+                if data[i] & mask[i] != magic[i]:
+                    break
+            else:
+                return keys['interpreter']
+

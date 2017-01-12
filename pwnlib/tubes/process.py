@@ -355,18 +355,6 @@ class process(tube):
             if (st.st_mode & stat.S_ISGID):
                 self.setgid = st.st_gid
 
-        # Try to figure out if the process is running under QEMU, even if
-        # we didn't explicitly invoke it that way -- e.g. if binfmt_helpers
-        # is enabled.
-        if not self._qemu:
-            try:
-                exe = os.readlink('/proc/%i/exe' % self.pid)
-                if exe.startswith('qemu-'):
-                    self._qemu = True
-            except Exception:
-                pass
-
-
     def __preexec_fn(self):
         """
         Routine executed in the child process before invoking execve().
