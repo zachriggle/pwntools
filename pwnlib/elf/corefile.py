@@ -979,7 +979,7 @@ class CorefileFinder(object):
             '%I': str(self.pid),
             '%p': str(self.pid),
             '%P': str(self.pid),
-            '%s': str(-self.proc.poll()),
+            '%s': str(-self.process.poll()),
             '%u': str(self.uid)
         }
         replace = dict((re.escape(k), v) for k, v in replace.iteritems())
