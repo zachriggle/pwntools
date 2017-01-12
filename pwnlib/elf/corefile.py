@@ -414,6 +414,9 @@ class Corefile(ELF):
         #: :class:`int`: Number of arguments passed
         self.argc = 0
 
+        # Pointer to the executable filename on the stack
+        self.at_execfn = 0
+
         try:
             super(Corefile, self).__init__(*a, **kw)
         except IOError:
@@ -649,7 +652,13 @@ class Corefile(ELF):
         # AT_EXECFN is the start of the filename, e.g. '/bin/sh'
         # Immediately preceding is a NULL-terminated environment variable string.
         # We want to find the beginning of it
-        address = self.at_execfn-1
+        if self.at_execfn:
+            address = self.at_execfn-1
+        else:
+            address = stack.end-2*self.bytes
+            address -= 1
+            address = self.stack.rsearch('\x00', None, address)
+            address += 1
 
         # Sanity check!
         try:
