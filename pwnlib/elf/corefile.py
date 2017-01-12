@@ -811,7 +811,7 @@ class CorefileFinder(object):
 
         self.interpreter = self.binfmt_lookup()
 
-        if self.interpreter and self.interpreter.contains('qemu-'):
+        if 'qemu-' in self.interpreter:
             self.core_path = self.qemu_corefile()
         else:
             self.core_path = self.native_corefile()
@@ -1030,10 +1030,10 @@ class CorefileFinder(object):
         binfmt_misc = '/proc/sys/fs/binfmt_misc'
 
         if not isinstance(self.process, process):
-            return
+            return ''
 
         if not os.path.isdir(binfmt_misc):
-            return
+            return ''
 
         exe_data = bytearray(self.read(self.exe))
 
@@ -1069,4 +1069,6 @@ class CorefileFinder(object):
                     break
             else:
                 return keys['interpreter']
+
+        return ''
 
