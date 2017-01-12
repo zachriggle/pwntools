@@ -34,6 +34,16 @@ setup_travis()
     uname -a
     sysctl -a
 
+    # Create crash dumps for everything
+    # N.B.: Apport crash dumps != Core dumps, but contain them
+    mkdir -p ~/.config/apport
+    cat > ~/.config/apport/settings <<EOF
+[main]
+unpackaged=true
+EOF
+    sh -c 'kill -11 $$'
+    ls -la /var/crash $PWD/core*
+
     # Install libbfd-multiarch and libopcodes-multiarch if not found in the cache
     if [ ! -f usr/lib/libbfd-2.22-multiarch.so ];
     then
