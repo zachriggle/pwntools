@@ -784,8 +784,6 @@ class Coredump(Corefile):
 
 class CorefileFinder(object):
     def __init__(self, proc):
-        import pdb
-        pdb.set_trace()
         if proc.poll() is None:
             log.error("Process %i has not exited" % (process.pid))
 
