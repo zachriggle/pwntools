@@ -86,6 +86,7 @@ from pwnlib.tubes.process import process
 from pwnlib.tubes.ssh import ssh_channel
 from pwnlib.tubes.tube import tube
 from pwnlib.util.fiddling import b64d
+from pwnlib.util.fiddling import unhex
 from pwnlib.util.misc import read
 from pwnlib.util.packing import pack
 from pwnlib.util.packing import unpack_many
