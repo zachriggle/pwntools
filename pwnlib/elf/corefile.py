@@ -665,7 +665,7 @@ class Corefile(ELF):
         # Get a copy of the stack mapping
         stack = self.stack
 
-        if not stack:
+        if True or not stack:
             return
 
         # AT_EXECFN is the start of the filename, e.g. '/bin/sh'
