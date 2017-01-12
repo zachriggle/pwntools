@@ -901,7 +901,7 @@ class CorefileFinder(object):
         Returns:
             `str`: Raw contents of the crash file or ``None``.
         """
-        uid = process.suid
+        uid = self.suid
         crash_name = self.exe.replace('/', '_')
 
         crash_path = '/var/crash/%s.%i.crash' % (crash_name, uid)
@@ -978,7 +978,7 @@ class CorefileFinder(object):
             '%I': str(self.pid),
             '%p': str(self.pid),
             '%P': str(self.pid),
-            '%s': str(-process.poll()),
+            '%s': str(-self.procpoll()),
             '%u': str(self.uid)
         }
         replace = dict((re.escape(k), v) for k, v in replace.iteritems())
