@@ -1055,13 +1055,13 @@ class CorefileFinder(object):
 
                 keys[k] = v
 
-            if not keys['magic']:
+            if 'magic' not in keys:
                 continue
 
             magic = bytearray(unhex(keys['magic']))
             mask  = bytearray('\xff' * len(magic))
 
-            if keys['mask']:
+            if 'mask' in keys:
                 mask = bytearray(unhex(keys['mask']))
 
             for i in range(len(magic)):
