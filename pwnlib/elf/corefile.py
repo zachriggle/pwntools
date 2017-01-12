@@ -426,12 +426,12 @@ class Corefile(ELF):
         if not self.elftype == 'CORE':
             log.error("%s is not a valid corefile" % self.file.name)
 
-        if not self.arch in ('i386','amd64'):
-            log.error("%s does not use a supported corefile architecture" % self.file.name)
+        if not self.arch in []: # prstatus_types.keys():
+            log.warn_once("%s does not use a supported corefile architecture, registers are unavailable" % self.file.name)
 
-        prstatus_type = prstatus_types[self.arch]
-        prspinfo_type = prspinfo_types[self.bits]
-        siginfo_type = siginfo_types[self.bits]
+        prstatus_type = prstatus_types.get(self.arch, None)
+        prspinfo_type = prspinfo_types.get(self.bits, None)
+        siginfo_type = siginfo_types.get(self.bits, None)
 
         with log.waitfor("Parsing corefile...") as w:
             self._load_mappings()
