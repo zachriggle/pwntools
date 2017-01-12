@@ -655,7 +655,7 @@ class Corefile(ELF):
         if self.at_execfn:
             address = self.at_execfn-1
         else:
-            address = stack.end-2*self.bytes
+            address = stack.stop-2*self.bytes
             address -= 1
             address = self.stack.rsearch('\x00', None, address)
             address += 1
