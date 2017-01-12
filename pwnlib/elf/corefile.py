@@ -1019,39 +1019,3 @@ class CorefileFinder(object):
         # Glob all of them, return the *most recent* based on numeric sort order.
         for corefile in sorted(glob.glob(corefile_path), reverse=True):
             return corefile
-
-    def _load_core_expect_pid(path, pid):
-        pass
-
-    def _rename_apport_corefile():
-        pass
-
-    def _extract_apport_coredump(path):
-        with open(path, 'rt') as file:
-            # Find the CoreDump
-            for line in file:
-                if line.startswith('CoreDump: base64'):
-                    break
-            else:
-                return
-
-            # Get all of the base64'd lines
-            chunks = []
-            for line in file:
-                if not line.startswith(' '):
-                    break
-                chunks.append(b64d(line))
-
-            # Smush everything together, then extract it
-            compressed_data = ''.join(chunks)
-            compressed_file = StringIO.StringIO(compressed_data)
-            gzip_file = gzip.GzipFile(fileobj=compressed_file)
-            core_data = gzip_file.read()
-
-            # Create a temporary file
-            tmp = tempfile.mktemp(prefix='pwn-core-')
-
-            with open(tmp, 'wb+') as file:
-                file.write(core_data)
-
-            return tmp
