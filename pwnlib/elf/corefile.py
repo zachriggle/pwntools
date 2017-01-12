@@ -329,8 +329,6 @@ class Corefile(ELF):
         object.  Each mapping can be accessed with virtual addresses via subscript, or
         contents can be examined via the :attr:`.Mapping.data` attribute.
 
-        >>> core.exe.path == elf.path
-        True
         >>> core.exe.address == address
         True
 
@@ -345,9 +343,9 @@ class Corefile(ELF):
 
         The core file also has registers which can be accessed direclty.
 
-        >>> core.eip == 0xcafebabe
+        >>> core.pc == 0xcafebabe
         True
-        >>> core.eax == 0xdeadbeef
+        >>> core.r0 == 0xdeadbeef
         True
 
         We may not always know which signal caused the core dump, or what address
@@ -397,6 +395,9 @@ class Corefile(ELF):
 
         #: The NT_PRSPINFO object
         self.prspinfo = None
+
+        #: The NT_SIGINFO object
+        self.siginfo = None
 
         #: :class:`dict`: Dictionary of memory mappings from ``address`` to ``name``
         self.mappings = []
