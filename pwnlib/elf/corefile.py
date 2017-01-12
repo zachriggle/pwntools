@@ -96,6 +96,7 @@ log = getLogger(__name__)
 prstatus_types = {
     'i386': elf_prstatus_i386,
     'amd64': elf_prstatus_amd64,
+    'arm': elf_prstatus_arm
 }
 
 prspinfo_types = {
