@@ -848,7 +848,7 @@ class CorefileFinder(object):
             `str`: Raw core file contents
         """
         crash_data = self.apport_read_crash_data()
-        return apport_crash_extract_corefile(crash_data)
+        return self.apport_crash_extract_corefile(crash_data)
 
     def apport_crash_extract_corefile(crashfile_data):
         """Extract a corefile from an apport crash file contents.
