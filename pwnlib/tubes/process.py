@@ -899,11 +899,12 @@ class process(tube):
             True
         """
         # If the process is still alive, try using GDB
+        import pwnlib.elf.corefile
+        import pwnlib.gdb
+
         if self.poll() is None:
-            import pwnlib.gdb
             return pwnlib.gdb.corefile(self)
 
-        import pwnlib.elf.corefile
         finder = pwnlib.elf.corefile.CorefileFinder(self)
         if not finder.core_path:
             self.error("Could not find core file for pid %i" % self.pid)
