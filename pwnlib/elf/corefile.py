@@ -1039,12 +1039,17 @@ class CorefileFinder(object):
         for entry in os.listdir(binfmt_misc):
             keys = {}
 
-            if entry in ('status', 'register'):
+            path = os.path.join(binfmt_misc, entry)
+
+            try:
+                data = self.read(path)
+            except Exception:
                 continue
 
-            for line in self.read(os.path.join(binfmt_misc, entry)).splitlines():
-                k,v = line.split(None, 1)
-                keys[k] = v
+            for line in data.splitlines():
+                if ' ' in line:
+                    k,v = line.split(None, 1)
+                    keys[k] = v
 
             if not keys['magic']:
                 continue
