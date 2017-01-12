@@ -423,10 +423,10 @@ class Corefile(ELF):
         self._address  = 0
 
         if not self.elftype == 'CORE':
-            log.error("%s is not a valid corefile" % e.file.name)
+            log.error("%s is not a valid corefile" % self.file.name)
 
         if not self.arch in ('i386','amd64'):
-            log.error("%s does not use a supported corefile architecture" % e.file.name)
+            log.error("%s does not use a supported corefile architecture" % self.file.name)
 
         prstatus_type = prstatus_types[self.arch]
         prspinfo_type = prspinfo_types[self.bits]
