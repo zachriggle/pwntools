@@ -304,15 +304,18 @@ class Corefile(ELF):
 
         >>> if os.path.exists('core'): os.unlink('core')
 
-        Let's build an example binary which should eat ``EAX=0xdeadbeef``
-        and ``EIP=0xcafebabe``.
+        Let's build an example binary which should eat ``R0=0xdeadbeef``
+        and ``PC=0xcafebabe``.
 
         If we run the binary and then wait for it to exit, we can get its
         core file.
 
-        >>> shellcode = 'mov eax, 0xdeadbeef; push 0xcafebabe; ret'
+        >>> context.arch = 'arm'
+        >>> shellcode = shellcraft.mov('r0', 0xdeadbeef)
+        >>> shellcode += shellcraft.mov('r1', 0xcafebabe)
+        >>> shellcode += 'bx r1'
         >>> address = 0x41410000
-        >>> elf = ELF.from_assembly(shellcode, vma=address, arch='i386')
+        >>> elf = ELF.from_assembly(shellcode, vma=address)
         >>> io = process(elf.path, env={'HELLO': 'WORLD'})
         >>> io.poll(block=True) == -signal.SIGSEGV
         True

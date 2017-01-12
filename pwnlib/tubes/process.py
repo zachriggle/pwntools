@@ -904,7 +904,10 @@ class process(tube):
             return pwnlib.gdb.corefile(self)
 
         import pwnlib.elf.corefile
-        return pwnlib.elf.corefile.Corefile.find_corefile(self)
+        finder = pwnlib.elf.corefile.CorefileFinder(self)
+        if not finder.core_path:
+            self.error("Could not find core file for pid %i" % self.pid)
+        return pwnlib.elf.corefile.Corefile(finder.core_path)
 
     def leak(self, address, count=1):
         r"""Leaks memory within the process at the specified address.
