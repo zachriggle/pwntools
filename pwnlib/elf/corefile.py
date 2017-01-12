@@ -442,7 +442,8 @@ class Corefile(ELF):
                 for note in iter_notes(segment):
                     # Try to find NT_PRSTATUS.  Note that pyelftools currently
                     # mis-identifies the enum name as 'NT_GNU_ABI_TAG'.
-                    if note.n_descsz == ctypes.sizeof(prstatus_type) and \
+                    if prstatus_type and \
+                       note.n_descsz == ctypes.sizeof(prstatus_type) and \
                        note.n_type == 'NT_GNU_ABI_TAG':
                         self.NT_PRSTATUS = note
                         self.prstatus = prstatus_type.from_buffer_copy(note.n_desc)
@@ -451,7 +452,7 @@ class Corefile(ELF):
                     # Note that pyelftools currently mis-identifies the enum name
                     # as 'NT_GNU_BUILD_ID'
                     if note.n_descsz == ctypes.sizeof(prspinfo_type) and \
-                      note.n_type == 'NT_GNU_BUILD_ID':
+                       note.n_type == 'NT_GNU_BUILD_ID':
                         self.NT_PRSPINFO = note
                         self.prspinfo = prspinfo_type.from_buffer_copy(note.n_desc)
 
@@ -776,7 +777,7 @@ class Corefile(ELF):
             if hasattr(self.prstatus.pr_reg, attribute):
                 return getattr(self.prstatus.pr_reg, attribute)
 
-        return super(Core, self).__getattribute__(attribute)
+        return super(Corefile, self).__getattribute__(attribute)
 
 class Core(Corefile):
     """Alias for :class:`.Corefile`"""
