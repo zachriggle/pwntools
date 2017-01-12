@@ -199,6 +199,12 @@ class Mapping(object):
             start = int(item.start or self.start)
             stop  = int(item.stop or self.stop)
 
+            # Negative slices...
+            if start < 0:
+                start += self.stop
+            if stop < 0:
+                stop += self.stop
+
             if not (self.start <= start <= stop <= self.stop):
                 log.error("Byte range [%#x:%#x] not within range [%#x:%#x]" \
                     % (start, stop, self.start, self.stop))
@@ -352,12 +358,15 @@ class Corefile(ELF):
         caused a segmentation fault.  Instead of accessing registers directly, we
         can also extract this information from the core dump.
 
-        >>> core.fault_addr == 0xcafebabe
+        Unfortunately, these only work on native core-dumps (i.e., not with
+        QEMU-generated ones).
+
+        >>> core.fault_addr == 0xcafebabe #doctest: +SKIP
         True
-        >>> core.signal == signal.SIGSEGV
+        >>> core.signal == signal.SIGSEGV #doctest: +SKIP
         True
 
-        Various other mappings are available by name.  On Linux, 32-bit binaries
+        Various other mappings are available by name.  On Linux, 32-bit Intel binaries
         should have a VDSO section.  Since our ELF is statically linked, there is
         no libc which gets mapped.
 
@@ -478,6 +487,11 @@ class Corefile(ELF):
                     if note.n_type == constants.NT_AUXV:
                         with context.local(bytes=self.bytes):
                             self._parse_auxv(note)
+
+            if not self.stack and self.mappings:
+                for mapping in mappings[::-1]:
+                    if mapping[-]
+                self.stack = self.mappings[-1]
 
             if self.stack and self.mappings:
                 for mapping in self.mappings:
