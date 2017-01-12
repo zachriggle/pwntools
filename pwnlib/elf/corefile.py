@@ -984,6 +984,7 @@ class CorefileFinder(object):
         }
         replace = dict((re.escape(k), v) for k, v in replace.iteritems())
         pattern = re.compile("|".join(replace.keys()))
+        core_pattern = self.kernel_core_pattern
         corefile_path = pattern.sub(lambda m: replace[re.escape(m.group(0))], core_pattern)
 
         if self.kernel_core_uses_pid:
