@@ -1048,9 +1048,12 @@ class CorefileFinder(object):
                 continue
 
             for line in data.splitlines():
-                if ' ' in line:
-                    k,v = line.split(None, 1)
-                    keys[k] = v
+                try:
+                    k,v = line.split(None)
+                except ValueError:
+                    continue
+
+                keys[k] = v
 
             if not keys['magic']:
                 continue
