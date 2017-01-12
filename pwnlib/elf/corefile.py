@@ -1035,7 +1035,7 @@ class CorefileFinder(object):
         if not os.path.isdir(binfmt_misc):
             return
 
-        data = self.read(self.exe)
+        exe_data = bytearray(self.read(self.exe))
 
         for entry in os.listdir(binfmt_misc):
             keys = {}
@@ -1062,7 +1062,7 @@ class CorefileFinder(object):
                 mask = bytearray(unhex(keys['mask']))
 
             for i in range(len(magic)):
-                if data[i] & mask[i] != magic[i]:
+                if exe_data[i] & mask[i] != magic[i]:
                     break
             else:
                 return keys['interpreter']
