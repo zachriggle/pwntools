@@ -1025,18 +1025,21 @@ class CorefileFinder(object):
 
     def binfmt_lookup(self):
         """Parses /proc/sys/fs/binfmt_misc to find the interpreter for a file"""
+
+        binfmt_misc = '/proc/sys/fs/binfmt_misc'
+
         if not isinstance(self.process, process):
             return
 
-        if not os.path.isdir('/proc/sys/fs/binfmt_misc'):
+        if not os.path.isdir(binfmt_misc):
             return
 
         data = self.read(self.exe)
 
-        for entry in os.listdir('/proc/sys/fs/binfmt_misc'):
+        for entry in os.listdir(binfmt_misc):
             keys = {}
 
-            for line in self.read(entry):
+            for line in self.read(os.path.join(binfmt_misc, entry)):
                 k,v = line.split(None, 1)
                 keys[k] = v
 
