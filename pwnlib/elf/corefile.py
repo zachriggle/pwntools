@@ -1039,6 +1039,9 @@ class CorefileFinder(object):
         for entry in os.listdir(binfmt_misc):
             keys = {}
 
+            if entry in ('status', 'register'):
+                continue
+
             for line in self.read(os.path.join(binfmt_misc, entry)).splitlines():
                 k,v = line.split(None, 1)
                 keys[k] = v
