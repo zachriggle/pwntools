@@ -384,7 +384,10 @@ class ssh_channel(sock):
         finder = pwnlib.elf.corefile.CorefileFinder(self)
         if not finder.core_path:
             self.error("Could not find core file for pid %i" % self.pid)
-        return pwnlib.elf.corefile.Corefile(finder.core_path)
+
+        self.parent.download_file(finder.core_path)
+
+        return pwnlib.elf.corefile.Corefile(os.path.basename(core_path))
 
 class ssh_connecter(sock):
     def __init__(self, parent, host, port, *a, **kw):

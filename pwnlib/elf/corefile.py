@@ -963,7 +963,7 @@ class CorefileFinder(object):
         if self.kernel_core_pattern.startswith('|'):
             return self.native_corefile_pipe()
 
-        return self.native_corefile_path()
+        return self.native_corefile_pattern()
 
     def native_corefile_pipe(self):
         """native_corefile_pipe(self) -> str
@@ -1027,8 +1027,11 @@ class CorefileFinder(object):
         if os.pathsep not in corefile_path:
             corefile_path = os.path.join(self.cwd, corefile_path)
 
-        if os.path.exists(corefile_path):
+        try:
+            self.read(corefile_path)
             return corefile_path
+        except Exception:
+            pass
 
     def qemu_corefile(self):
         """qemu_corefile() -> str
