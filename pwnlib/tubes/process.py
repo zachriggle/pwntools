@@ -11,6 +11,7 @@ import pty
 import resource
 import select
 import signal
+import shutil
 import subprocess
 import time
 import tty
@@ -908,7 +909,11 @@ class process(tube):
         finder = pwnlib.elf.corefile.CorefileFinder(self)
         if not finder.core_path:
             self.error("Could not find core file for pid %i" % self.pid)
-        return pwnlib.elf.corefile.Corefile(finder.core_path)
+
+        new_path = 'core.%i' % self.pid
+        shutil.move(finder.core_path, core_path)
+
+        return pwnlib.elf.corefile.Corefile(core_path)
 
     def leak(self, address, count=1):
         r"""Leaks memory within the process at the specified address.
