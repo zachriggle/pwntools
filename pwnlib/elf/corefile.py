@@ -836,7 +836,7 @@ class CorefileFinder(object):
             self.unlink = os.unlink
         elif isinstance(proc, ssh_channel):
             self.read = proc.parent.read
-            self.ulink = proc.parent.unlink
+            self.unlink = proc.parent.unlink
 
         self.kernel_core_pattern = self.read('/proc/sys/kernel/core_pattern').strip()
         self.kernel_core_uses_pid = bool(int(self.read('/proc/sys/kernel/core_uses_pid')))
