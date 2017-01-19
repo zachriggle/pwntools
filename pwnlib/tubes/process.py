@@ -910,10 +910,7 @@ class process(tube):
         if not finder.core_path:
             self.error("Could not find core file for pid %i" % self.pid)
 
-        new_path = 'core.%i' % self.pid
-        shutil.move(finder.core_path, core_path)
-
-        return pwnlib.elf.corefile.Corefile(core_path)
+        return pwnlib.elf.corefile.Corefile(finder.core_path)
 
     def leak(self, address, count=1):
         r"""Leaks memory within the process at the specified address.

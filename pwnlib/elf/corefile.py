@@ -68,6 +68,7 @@ import glob
 import gzip
 import re
 import os
+import shutil
 import socket
 import StringIO
 import tempfile
@@ -846,7 +847,20 @@ class CorefileFinder(object):
         else:
             self.core_path = self.native_corefile()
 
-    def load_core_check_pid(self, path):
+        core_pid = self.load_core_check_pid()
+
+        # Move the corefile
+        new_path = 'core.%i' % core_pid
+        shutil.move(self.core_path, new_path)
+        self.core_path = new_path
+
+        # Check the PID
+        if core_pid != self.pid:
+            log.warn("Corefile PID does not match! (got %i)" % core_pid)
+
+
+
+    def load_core_check_pid(self):
         """Test whether a Corefile matches our process
 
         Speculatively load a Corefile without informing the user, so that we
@@ -861,14 +875,11 @@ class CorefileFinder(object):
 
         try:
             with context.quiet:
-                corefile = Corefile(path)
-
-                if self.pid == corefile.pid:
-                    return True
+                return Corefile(self.core_path).pid
         except Exception:
             pass
 
-        return False
+        return -1
 
     def apport_corefile(self):
         """Find the apport crash for the process, and extract the core file.
