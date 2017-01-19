@@ -851,13 +851,14 @@ class CorefileFinder(object):
         if not self.core_path:
             return
 
+
+        core_pid = self.load_core_check_pid()
+
         # Move the corefile
         new_path = 'core.%i' % core_pid
         write(new_path, self.read(self.core_path))
         self.unlink(self.core_path)
         self.core_path = new_path
-
-        self.load_core_check_pid()
 
         # Check the PID
         if core_pid != self.pid:
@@ -880,7 +881,10 @@ class CorefileFinder(object):
 
         try:
             with context.quiet:
-                return Corefile(self.core_path).pid
+                with tempfile.NamedTemporaryFile() as tmp:
+                    tmp.write(self.read(self.core_path))
+                    tmp.flush()
+                    return Corefile(tmp.name).pid
         except Exception:
             pass
 
