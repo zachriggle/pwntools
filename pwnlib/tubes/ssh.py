@@ -374,6 +374,16 @@ class ssh_channel(sock):
                 e.address = address
                 return e
 
+    @property
+    def corefile(self):
+        if not getattr(self, 'pid', 0):
+            self.error("Corefile only works for ssh.process()")
+
+        finder = pwnlib.elf.corefile.CorefileFinder(self)
+        if not finder.core_path:
+            self.error("Could not find core file for pid %i" % self.pid)
+        return pwnlib.elf.corefile.Corefile(finder.core_path)
+
 class ssh_connecter(sock):
     def __init__(self, parent, host, port, *a, **kw):
         super(ssh_connecter, self).__init__(*a, **kw)
