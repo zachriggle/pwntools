@@ -89,6 +89,7 @@ from pwnlib.tubes.tube import tube
 from pwnlib.util.fiddling import b64d
 from pwnlib.util.fiddling import unhex
 from pwnlib.util.misc import read
+from pwnlib.util.misc import write
 from pwnlib.util.packing import pack
 from pwnlib.util.packing import unpack_many
 
@@ -854,7 +855,8 @@ class CorefileFinder(object):
 
         # Move the corefile
         new_path = 'core.%i' % core_pid
-        shutil.move(self.core_path, new_path)
+        write(new_path, self.read(self.core_path))
+        self.unlink(self.core_path)
         self.core_path = new_path
 
         # Check the PID
