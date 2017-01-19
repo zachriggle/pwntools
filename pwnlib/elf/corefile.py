@@ -847,6 +847,9 @@ class CorefileFinder(object):
         else:
             self.core_path = self.native_corefile()
 
+        if not self.core_path:
+            return
+
         core_pid = self.load_core_check_pid()
 
         # Move the corefile
