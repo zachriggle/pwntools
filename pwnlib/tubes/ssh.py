@@ -376,6 +376,8 @@ class ssh_channel(sock):
 
     @property
     def corefile(self):
+        import pwnlib.elf.corefile
+
         if not getattr(self, 'pid', 0):
             self.error("Corefile only works for ssh.process()")
 
