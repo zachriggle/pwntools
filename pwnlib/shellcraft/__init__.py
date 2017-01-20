@@ -147,6 +147,34 @@ class module(ModuleType):
             s = packing.pack(s, *a, **kw)
         return '\0' not in s and '\n' not in s
 
+    def strip(self, assembly):
+        """strip(assembly) -> assembly
+
+        Remove all comments and empty lines from the assembly listing.
+
+        This is useful when your shellcode needs to be chunked, without
+        breaking on an instruction boundary.
+
+        Example:
+
+            >>> print shellcraft.strip('''
+            ... /* Comments are stripped */
+            ...
+            ... xor eax, eax
+            ...
+            ... mov eax,/* So are inline comments */ 1
+            ...
+            ... /* Empty lines are also stripped */
+            ... ''')
+            xor eax, eax
+            mov eax, 1
+        """
+        comment = r'/\*.*?\*/'
+        assembly = re.sub(comment, '', assembly)
+
+        return '\n'.join(line for line in assembly.splitlines() if len(line.strip()))
+
+
     from pwnlib.shellcraft import registers
 
 # To prevent garbage collection
