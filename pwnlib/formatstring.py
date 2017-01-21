@@ -24,17 +24,15 @@ write_size_deltas = {
     4: write_size_max[4] - write_size_max[2],
 }
 
-write_strings_positional = {
-    1: '%{}$hhn',
-    2: '%{}$hn',
-    4: '%{}$n'
-}
 
 write_strings = {
     1: '%hhn',
     2: '%hn',
     4: '%n'
 }
+
+
+write_strings_positional = { i:'%@$' + write_strings[i] for i in write_strings }
 
 write = collections.namedtuple("write", ("address", "data"))
 
@@ -87,7 +85,8 @@ class FormatString(object):
                  already_written=0,
                  write_size=2,
                  format_buffer_size=0,
-                 function=printf):
+                 function=printf,
+                 padding='\x00'):
         """Initialize a FormatString object.
 
         Arguments:
@@ -111,6 +110,7 @@ class FormatString(object):
                 Can be either a function name (e.g. ``"snprintf"``) or an
                 instance of :class:`FormatFunction`.  The default value is
                 ``printf``.
+            padding(str): Byte to use for padding
 
         Note:
 
@@ -458,80 +458,104 @@ class FormatString(object):
         stack_buffer = []
         counter = self.already_written
 
-        # Both glibc and macOS update the parameter index on a positional.
-        # This means that contrary to common implementation, there is no
-        # need to use a positional specifier after the first one.
-        positional = True
-
         for addr, value in ordered_writes:
             size = len(memory[addr])
             fmt = ''
 
             # If we need to adjust the value which will be written, do it
-            if value != counter:
+            delta = value - counter
+
+            if delta > 3:
                 fmt += '%{}c'.format(value-counter)
-                counter = value
+            elif delta > 0:
+                fmt += ' ' * counter
+
+            counter = value
 
             # Actually write the value
-            if positional:
-                fmt += write_strings_positional[size]
-                positional = False
-            else:
-                fmt += write_strings[size]
+            fmt += write_strings_positional[size]
 
             # Save both
             format_strings.append(fmt)
             stack_buffer.append(addr)
 
-        # Put it all together, there should be a single positional placeholder
-        format_string = ''.join(format_strings) + '\x00'
+        # Loop until we get the right sizes, after adjustment
+        num_positions = len(format_strings)
 
-        format_buffer_size = self.format_buffer_size
-        stack_buffer_size = self.stack_buffer_size
-        stack_buffer_offset = self.stack_buffer_offset
-        padding = 0
+        # A copy of the format string with '@' for placeholders
+        format_string_raw = ''.join(format_strings)
 
-        # If the format buffer is "included" in the stack buffer, make adjustments
-        if not format_buffer_size:
-            fmt_len = len(format_string)
+        # How many extra bytes do the actual positionals incur?
+        extra = 0
 
-            # Set the format buffer size to be the size of the overall buffer
-            format_buffer_size = min(fmt_len, stack_buffer_size)
+        # Save off the original stack_buffer data
+        stack_buffer_raw = list(stack_buffer)
 
-            # Adjust the amount of remaining data
-            stack_buffer_size -= fmt_len
-            stack_buffer_offset += fmt_len
+        while True:
+            # Restore everything to its original values
+            format_string = str(format_string_raw)
+            stack_buffer = list(stack_buffer_raw)
 
+            # Get temporary / local copies of the sizes
+            format_buffer_size = self.format_buffer_size
+            stack_buffer_size = self.stack_buffer_size
+            stack_buffer_offset = self.stack_buffer_offset
 
-        # Adjust the stack buffer to be 4-byte aligned
-        while stack_buffer_offset % context.bytes:
-            stack_buffer.insert(0, '\x00')
-            stack_buffer_offset += 1
+            # If the format buffer is "included" in the stack buffer, make adjustments
+            if not format_buffer_size:
+                fmt_len = len(format_string) + extra
 
-        # Calculate the offset for the positional argument
-        stack_buffer_index = self.stack_index
-        stack_buffer_index += (stack_buffer_offset // context.bytes)
-        stack_buffer_index += 1
+                # Set the format buffer size to be the size of the overall buffer
+                format_buffer_size = min(fmt_len, stack_buffer_size)
 
-        # Don't support more than 99 right now, because lazy
-        if stack_buffer_index > 99:
-            log.error("Argument offset is too high (%i). Max is 99." % stack_buffer_index)
+                # Adjust the amount of remaining data
+                stack_buffer_size -= fmt_len
+                stack_buffer_offset += fmt_len
 
-        # Update the positional argument in the format string.
-        # If the positional index is <10, we need to pad it with
-        # a leading zero.
-        #
-        # XXX: This is a single-byte inefficiency that can be fixed.
-        index_str = "%02i" % stack_buffer_index
+            # Adjust the stack buffer to be 4-byte aligned
+            while stack_buffer_offset % context.bytes:
+                stack_buffer.insert(0, '\x00')
+                stack_buffer_offset += 1
+
+            # Calculate the offset for the positional argument
+            stack_buffer_index = self.stack_index + self.format_index
+            stack_buffer_index += (stack_buffer_offset // context.bytes)
+
+            # Calculate the positional arguments.  They are represented by '@' symbols.
+            num_positions = format_string.count('@')
+
+            # Calculate the highest positional value
+            stack_buffer_index_max = stack_buffer_index + num_positions
+
+            # The total amount of space which the positional specifiers use up
+            positionals = ''.join(map(str, range(stack_buffer_index, stack_buffer_index_max)))
+            positional_width = len(positionals)
+
+            # We already account for the single character per positional with
+            # the embedded '@'
+            positional_width_extra = positional_width - num_positions
+
+            # How much "extra" we need
+            if extra != positional_width_extra:
+                extra = positional_width_extra
+                continue
+
+            # We were correct!  Perform the replacements
+            while '@' in format_string:
+                format_string = format_string.replace('@', str(stack_buffer_index), 1)
+                stack_buffer_index += 1
+
+            # Double check that we were correct
+            assert len(format_string) == len(format_string_raw) + extra
+            break
 
         # Get our format string and stack data! Woot!
-        format_string = format_string.format(index_str)
         stack_data = flat(stack_buffer)
 
         # Perform final size checks
         if format_buffer_size < len(format_string):
-            log.error("Cannot fit the format string in %i bytes.\n%r" % (format_buffer_size,
-                                                                         len(format_string)))
+            log.error("Cannot fit the format string in %i bytes. (need %r %r)"
+                        % (format_buffer_size, len(format_string), (format_string)))
 
         if stack_buffer_size < len(stack_data):
             log.error("Cannot fit the stack data in %i bytes.  Need %i.\n"
