@@ -271,7 +271,7 @@ class FormatString(object):
         for address in stack_addresses:
             if address > stack_pointer:
                 offset = stack_pointer - address
-                message = "Found data on stack = {address:#x}\n" \
+                message = "Found {length:#x} bytes of data on stack = {address:#x}\n" \
                         + "Stack pointer @ {stack_pointer:#x}\n" \
                         + "Offset in bytes = {offset:#x}"
 
