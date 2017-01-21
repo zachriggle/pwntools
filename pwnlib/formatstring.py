@@ -209,6 +209,12 @@ class FormatString(object):
         #: Operand stack, of what is being performed
         self.memory = {}
 
+        self._dirty = True
+        self._format_string = None
+        self._stack_data = None
+        self._writes = None
+
+
     @property
     def format_index(self):
         return self.function.format_index
@@ -292,8 +298,11 @@ class FormatString(object):
         return self.memory.get(index, None)
 
     def __setitem__(self, index, value):
+        self._dirty = True
+
         for i, byte in enumerate(flat(value)):
             self.memory[index + i] = byte
+
 
     # ----- READ RELATED FUNCTIONS -----
     def leak(self, address):
@@ -302,25 +311,30 @@ class FormatString(object):
     # ----- FORMAT STRING CREATION -----
     @property
     def format_string(self):
-        return self._generate()[0]
+        self._generate()
+
+        if self.format_buffer_size:
+            return self._format_string
+
+        return self._format_string + self._stack_data
 
     @property
     def stack_data(self):
-        return self._generate()[1] or self._generate()[0]
+        self._generate()
+        return self._stack_data
 
     @property
     def writes(self):
-        return self._generate()[2]
+        self._generate()
+        return self._writes
 
     def _generate(self):
         """_generate(size=1) -> str
 
         Generate the format string.
-
-        Returns:
-            A tuple of ``(format_string, stack_data, writes)``,
-            where ``writes`` is a list of :class:`.formatstring.write` objects.
         """
+        if not self._dirty:
+            return
 
         # Coalesce writes into chunks of write_size or smaller
         write_sizes = []
@@ -520,7 +534,10 @@ class FormatString(object):
             log.error("Cannot fit the stack data in %i bytes.  Need %i.\n"
                         % (stack_buffer_size, len(stack_data)))
 
-        return format_string, stack_data, ordered_writes
+        self._format_string = format_string
+        self._stack_data = stack_data
+        self._writes = ordered_writes
+        self._dirty = False
 
     def dump(self):
         rv = []
