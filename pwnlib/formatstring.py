@@ -254,12 +254,12 @@ class FormatString(object):
         # The data that the user gave us may not actually appear anywhere
         # in the process, because it may have been truncated by e.g. fgets()
         length = 0
-        stack_data_address = 0
+        address = 0
         while True:
             # The data must be on the stack, and at a higher address than sp
-            for address in sorted(corefile.search(stack_data[:length])):
-                if address > stack_pointer:
-                    stack_data_address = address
+            for match in sorted(corefile.search(stack_data[:length])):
+                if match > stack_pointer:
+                    address = match
                     break
             else:
                 break
@@ -269,7 +269,8 @@ class FormatString(object):
 
             length += 1
 
-        stack_data = stack_data[:length]
+        if not address or length == 0 or length < len(stack_data / 2):
+            log.error("Could not find a suitable stack address")
 
         offset = stack_pointer - address
         message = "Found {length:#x} bytes of data on stack = {address:#x}\n" \
