@@ -62,7 +62,7 @@ class FormatFunction(object):
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__,
-                               self.index,
+                               self.format_index,
                                self.name)
 
 # First argument
@@ -272,7 +272,7 @@ class FormatString(object):
         if not address or length == 0 or length < len(stack_data) / 2:
             log.error("Could not find a suitable stack address")
 
-        offset = stack_pointer - address
+        offset = address - stack_pointer
         message = "Found {length:#x} bytes of data on stack = {address:#x}\n" \
                 + "Stack pointer @ {stack_pointer:#x}\n" \
                 + "Offset in bytes = {offset:#x}"
