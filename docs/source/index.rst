@@ -54,7 +54,7 @@ Each of the ``pwntools`` modules is documented here.
    elf/*
    exception
    flag
-   fmtstr
+   formatstring
    gdb
    log
    memleak

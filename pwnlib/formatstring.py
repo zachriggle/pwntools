@@ -1,10 +1,13 @@
+# -*- coding: utf-8 -*-
 import collections
 import os
 
+from pwnlib.context import context
 from pwnlib.util.iters import group
 from pwnlib.abi import ABI
 from pwnlib.log import getLogger
-from pwnlib.tubes.tubes.process import process
+from pwnlib.tubes.process import process
+from pwnlib.util.packing import unpack
 from pwnlib.util.packing import flat
 
 log = getLogger(__name__)
@@ -58,8 +61,8 @@ class FormatFunction(object):
         return max(0, len(abi.register_arguments) - self.format_index)
 
     def __repr__(self):
-        return '%s(%s, %r)' % (self.__class__.__name__,
-                               self.format_index,
+        return '%s(%r, %r)' % (self.__class__.__name__,
+                               self.index,
                                self.name)
 
 # First argument
@@ -139,14 +142,48 @@ class FormatString(object):
                 [stack]         0xffffcb96 'aaaabaaacaaadaa...'
                 [stack]         0xffffcbb4 'aaaabaaa'
 
+        Tests:
+
+            >>> f = FormatString(0x94, 100)
+
+            By default, an empty format string is returned.
+
+            >>> f.payload()
+            ''
+
+            If some memory is set, the payload changes accordingly.
+
+            >>> f[0xdeadbeef] = 'A'
+            >>> f.payload()
+            '%65c%07$hhnX\xef\xbe\xad\xde'
+
+            Memory sizing is determined automatically (note ``hhn`` vs ``hn``)
+
+            >>> f[0xdeadbeef] = 'AA'
+            >>> f.payload()
+            '%16705c%08$hnXXX\xf0\xbe\xad\xde'
+
+            Multiple writes are supported, and positional indices are collapsed.
+
+            >>> f[0xcafebabe] = 'AB'
+            '%16705c%10$hn%256c%hnXXX\xf0\xbe\xad\xde\xbf\xba\xfe\xca'
+
+            Repeated values are optimized and collapsed.
+
+            >>> f[0xcafebabe] = 'AA'
+            >>> f.payload()
+            '%16705c%08$hn%hn\xf0\xbe\xad\xde\xbf\xba\xfe\xca'
+
+            Integers and addresses can be used instead of strings, as well.
+
+            >>> f[0xdecafbad] = 0x41414141
+            >>> f.payload()
+            '%16705c%09$hn%hn%hnX\xf0\xbe\xad\xde\xb0\xfb\xca\xde\xbf\xba\xfe\xca'
         """
 
         # Determine our calling convention / dollar-argument model
         if isinstance(function, str):
             function = FormatFunction.registry.get(function, None)
-
-        elif format_index:
-            function = FormatFunction(format_index)
 
         elif not function:
             function = printf
@@ -196,12 +233,23 @@ class FormatString(object):
         pass
 
     # ----- FORMAT STRING CREATION -----
-    def __str__(self):
-        return self._generate()
+    def payload(self):
+        """payload()
 
-    def payload(self, *a, **kw):
-        """Included for compatibility with libformatstr"""
-        return self._generate()
+        Generate the format string.
+
+        Returns:
+            If ``format_buffer_size`` was not provided, a single format
+            string is returned.
+
+            Otherwise, it returns a tuple of ``(format_string, stack_data)``.
+        """
+        fmt, data = self._generate()
+
+        if self.format_buffer_size:
+            return (fmt, data)
+
+        return fmt + data
 
     def _generate(self):
         """_generate(size=1) -> str
@@ -271,10 +319,11 @@ class FormatString(object):
                 freq_memory[chunk].append(address)
 
         # Optimize against frequency, starting with the most frequent
-        def count(data):
-            return len(freq_memory[data])
+        def count(chunk_addresses):
+            chunk, addresses = chunk_addresses
+            return len(addresses)
 
-        for chunk, addresses in sorted(freq_memory, key=count):
+        for chunk, addresses in sorted(freq_memory.items(), key=count):
 
             for address in addresses:
                 # Did we already optimize this chunk?
@@ -300,7 +349,7 @@ class FormatString(object):
             size = len(data)
             mask = (1 << (8*size)) - 1
 
-            value = pack(data, bytes=size)
+            value = unpack(data, bytes=size)
 
             value += self.already_written
             value &= mask
@@ -323,7 +372,7 @@ class FormatString(object):
         #
         # If our format string is in the same buffer as the stack buffer
         # we are using to store our pointers, we need to calculate its size.
-        format_string = []
+        format_strings = []
         stack_buffer = []
         counter = self.already_written
 
@@ -346,7 +395,7 @@ class FormatString(object):
                 fmt += write_strings_positional[size]
                 positional = False
             else:
-                fmt += write_positional[size]
+                fmt += write_strings[size]
 
             # Save both
             format_strings.append(fmt)
@@ -373,10 +422,9 @@ class FormatString(object):
 
 
         # Adjust the stack buffer to be 4-byte aligned
-        slack = stack_buffer_offset % context.bytes
-        if slack:
-            stack_buffer.insert(0, 'X' * slack)
-            stack_buffer_offset += slack
+        while stack_buffer_offset % context.bytes:
+            stack_buffer.insert(0, 'X')
+            stack_buffer_offset += 1
 
         # Calculate the offset for the positional argument
         stack_buffer_index = self.stack_index
@@ -391,7 +439,7 @@ class FormatString(object):
         # a leading zero.
         #
         # XXX: This is a single-byte inefficiency that can be fixed.
-        index_str = "%02i" % str(stack_buffer_index)
+        index_str = "%02i" % stack_buffer_index
 
         # Get our format string and stack data! Woot!
         format_string = format_string.format(index_str)
