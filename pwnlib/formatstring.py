@@ -309,7 +309,7 @@ class FormatString(object):
             If ``format_buffer_size`` was not provided, a single format
             string is returned.
 
-            Otherwise, it returns a tuple of ``(format_string, stack_data)``.
+            Otherwise, it returns
         """
         fmt, data = self._generate()
 
@@ -318,10 +318,26 @@ class FormatString(object):
 
         return fmt + data
 
+    @property
+    def format_string(self):
+        return self._generate()[0]
+
+    @property
+    def stack_data(self):
+        return self._generate()[1] or self._generate()[0]
+
+    @property
+    def writes(self):
+        return self._generate()[2]
+
     def _generate(self):
         """_generate(size=1) -> str
 
         Generate the format string.
+
+        Returns:
+            A tuple of ``(format_string, stack_data, writes)``,
+            where ``writes`` is a list of :class:`.formatstring.write` objects.
         """
 
         # Coalesce writes into chunks of write_size or smaller
@@ -523,6 +539,13 @@ class FormatString(object):
                         % (stack_buffer_size, len(stack_data)))
 
         return format_string, stack_data
+
+    def dump(self):
+        rv = []
+        for write in self.writes:
+            rv.append('%#x => %r' % (write.address, write.data))
+        return '\n'.join(rv)
+
 
 class AutomaticDiscoveryProcess(process):
     def __init__(self, argv, remote=True, size=None, **kw):
