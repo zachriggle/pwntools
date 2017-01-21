@@ -484,7 +484,7 @@ class FormatString(object):
             stack_buffer.append(addr)
 
         # Put it all together, there should be a single positional placeholder
-        format_string = ''.join(format_strings)
+        format_string = ''.join(format_strings) + '\x00'
 
         format_buffer_size = self.format_buffer_size
         stack_buffer_size = self.stack_buffer_size
@@ -505,7 +505,7 @@ class FormatString(object):
 
         # Adjust the stack buffer to be 4-byte aligned
         while stack_buffer_offset % context.bytes:
-            stack_buffer.insert(0, 'X')
+            stack_buffer.insert(0, '\x00')
             stack_buffer_offset += 1
 
         # Calculate the offset for the positional argument
