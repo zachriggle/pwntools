@@ -259,7 +259,11 @@ class FormatString(object):
         # The data must be on the stack, and at a lower address than sp
         for address in stack_addresses:
             if address < stack_pointer:
-                log.info("Found data on stack at %#x" % address)
+                message = "Found data on stack = {address:#x}\n" \
+                        + "Stack pointer @ {stack_pointer:#x}\n" \
+                        + "Offset in bytes = {offset:#x}"
+
+                log.info(message.format(**locals()))
                 break
         else:
             log.error("Could not find a suitable stack address")
