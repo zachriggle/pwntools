@@ -265,7 +265,7 @@ class FormatString(object):
             log.error("Could not find a suitable stack address")
 
         return FormatString(stack_buffer_offset=stack_pointer - address,
-                            stack_buffer_size=len(stack-data),
+                            stack_buffer_size=len(data),
                             format_buffer_size = len(format_string))
 
 
