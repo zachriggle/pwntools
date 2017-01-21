@@ -496,6 +496,7 @@ class FormatString(object):
         # Calculate the offset for the positional argument
         stack_buffer_index = self.stack_index
         stack_buffer_index += (stack_buffer_offset // context.bytes)
+        stack_buffer_index += 1
 
         # Don't support more than 99 right now, because lazy
         if stack_buffer_index > 99:
