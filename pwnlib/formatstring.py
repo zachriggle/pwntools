@@ -249,39 +249,37 @@ class FormatString(object):
 
             :class:`Corefile`: A corefile object
         """
+        stack_pointer = corefile.sp
 
         # The data that the user gave us may not actually appear anywhere
         # in the process, because it may have been truncated by e.g. fgets()
         length = 0
-        while len(tuple(corefile.search(stack_data[:length]))):
+        stack_data_address = 0
+        while True:
+            # The data must be on the stack, and at a higher address than sp
+            for address in sorted(corefile.search(stack_data[:length])):
+                if address > stack_pointer:
+                    stack_data_address = address
+                    break
+            else:
+                break
+
             if length == len(stack_data):
                 break
+
             length += 1
 
         stack_data = stack_data[:length]
 
-        stack_addresses = sorted(list(corefile.search(stack_data)))
-        stack_pointer = corefile.sp
+        offset = stack_pointer - address
+        message = "Found {length:#x} bytes of data on stack = {address:#x}\n" \
+                + "Stack pointer @ {stack_pointer:#x}\n" \
+                + "Offset in bytes = {offset:#x}"
 
-
-        if len(stack_addresses) == 0:
-            log.error("Could not find stack data %r anywhere in memory" % stack_data)
-
-        # The data must be on the stack, and at a lower address than sp
-        for address in stack_addresses:
-            if address > stack_pointer:
-                offset = stack_pointer - address
-                message = "Found {length:#x} bytes of data on stack = {address:#x}\n" \
-                        + "Stack pointer @ {stack_pointer:#x}\n" \
-                        + "Offset in bytes = {offset:#x}"
-
-                log.info(message.format(**locals()))
-                break
-        else:
-            log.error("Could not find a suitable stack address")
+        log.info(message.format(**locals()))
 
         return FormatString(stack_buffer_offset = offset,
-                            stack_buffer_size = len(stack_data),
+                            stack_buffer_size = length,
                             format_buffer_size = len(format_string))
 
 
