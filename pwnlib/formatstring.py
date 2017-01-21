@@ -258,6 +258,8 @@ class FormatString(object):
                 break
             length += 1
 
+        stack_data = stack_data[:length]
+
         stack_addresses = sorted(list(corefile.search(stack_data)))
         stack_pointer = corefile.sp
 
