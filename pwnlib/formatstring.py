@@ -214,6 +214,9 @@ class FormatString(object):
         self._stack_data = None
         self._writes = None
 
+        nargs = len(ABI.default().register_arguments)
+        log.info_once("Format strings skip %i register arguments" % nargs)
+
 
     @property
     def format_index(self):
