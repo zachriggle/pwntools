@@ -300,24 +300,6 @@ class FormatString(object):
         pass
 
     # ----- FORMAT STRING CREATION -----
-    def payload(self):
-        """payload()
-
-        Generate the format string.
-
-        Returns:
-            If ``format_buffer_size`` was not provided, a single format
-            string is returned.
-
-            Otherwise, it returns
-        """
-        fmt, data = self._generate()
-
-        if self.format_buffer_size:
-            return (fmt, data)
-
-        return fmt + data
-
     @property
     def format_string(self):
         return self._generate()[0]
