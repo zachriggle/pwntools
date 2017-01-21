@@ -32,7 +32,11 @@ write_strings = {
 }
 
 
-write_strings_positional = { i:'%@$' + write_strings[i] for i in write_strings }
+write_strings_positional = {
+    1: '%@$hhn',
+    2: '%@$hn',
+    4: '%@$n'
+}
 
 write = collections.namedtuple("write", ("address", "data"))
 
