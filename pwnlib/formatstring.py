@@ -250,8 +250,17 @@ class FormatString(object):
             :class:`Corefile`: A corefile object
         """
 
+        # The data that the user gave us may not actually appear anywhere
+        # in the process, because it may have been truncated by e.g. fgets()
+        length = 0
+        while len(tuple(corefile.search(stack_data[:length]))):
+            if length == len(stack_data):
+                break
+            length += 1
+
         stack_addresses = sorted(list(corefile.search(stack_data)))
         stack_pointer = corefile.sp
+
 
         if len(stack_addresses) == 0:
             log.error("Could not find stack data %r anywhere in memory" % stack_data)
