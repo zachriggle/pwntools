@@ -415,7 +415,7 @@ class FormatString(object):
                 for a in span:
                     del memory[a]
 
-                memory[a] = chunk
+                memory[address] = chunk
 
         # Memory is now in an optimal state for size.
         # Convert to integer values, instead of byte-strings.
