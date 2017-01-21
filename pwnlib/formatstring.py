@@ -258,7 +258,7 @@ class FormatString(object):
 
         # The data must be on the stack, and at a lower address than sp
         for address in stack_addresses:
-            if address < stack_pointer:
+            if address > stack_pointer:
                 offset = stack_pointer - address
                 message = "Found data on stack = {address:#x}\n" \
                         + "Stack pointer @ {stack_pointer:#x}\n" \
