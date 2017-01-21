@@ -1,11 +1,39 @@
+import collections
 import os
 
-from .abi import ABI
-from .log import getLogger
-from .tubes.process import process
-from .util.packing import pack
+from pwnlib.util.iters import group
+from pwnlib.abi import ABI
+from pwnlib.log import getLogger
+from pwnlib.tubes.tubes.process import process
+from pwnlib.util.packing import flat
 
 log = getLogger(__name__)
+
+write_size_max = {
+    1: len("%255c"),
+    2: len("%65535c"),
+    4: len("%4294967295c"),
+}
+
+write_size_deltas = {
+    1: write_size_max[1],
+    2: write_size_max[2] - write_size_max[1],
+    4: write_size_max[4] - write_size_max[2],
+}
+
+write_strings_positional = {
+    1: '%{}$hhn',
+    2: '%{}$hn',
+    4: '%{}$n'
+}
+
+write_strings = {
+    1: '%hhn',
+    2: '%hn',
+    4: '%n'
+}
+
+write = collections.namedtuple("write", ("address", "data"))
 
 class FormatFunction(object):
     """Encapsulates data about a function which takes a format string.
@@ -50,40 +78,99 @@ sscanf   = FormatFunction(2, 'sscanf')
 snprintf = FormatFunction(3, 'snprintf')
 
 class FormatString(object):
-    def __init__(self, on_stack=False, format_index=None, function=None):
+    def __init__(self,
+                 stack_buffer_offset,
+                 stack_buffer_size,
+                 already_written=0,
+                 write_size=2,
+                 format_buffer_size=0,
+                 function=printf):
         """Initialize a FormatString object.
 
         Arguments:
-            on_stack(bool): Whether the format string itself is on the stack.
-            format_index(int): Argument index of the format string.
-                For example, printf=1, sprintf=2, snprintf=3.
+            stack_buffer_offset(int): Offset (in bytes) to the region(s)
+                of controlled data on the stack.  The offset is calculated from
+                immediately after the return address (e.g. where printf returns
+                to).
+            stack_buffer_size(int): Size (in bytes) of the buffer described by
+                ``stack_buffer_offset``.
+            already_written(int): Number of bytes which have already been written
+                before our format string is used.  For the common case of
+                ``printf(buffer)``, the default value of ``0`` is correct.
+                However, if our format string gets concatenated to some other
+                data, this value should be set to the number of bytes printed
+                before our format string is evaluated.
+            write_size(int): Maximum number of bytes to write at a time.
+            format_buffer_size(int): Size (in byts) of the format string buffer.
+                Only set this if the format string buffer is not on the stack,
+                or not contiguous with the described via ``stack_buffer_offset``.
             function(FormatFunction, str): Format function which is invoked.
                 Can be either a function name (e.g. ``"snprintf"``) or an
-                instance of ``FormatFunction``.
-        """
+                instance of :class:`FormatFunction`.  The default value is
+                ``printf``.
 
-        # Must specify one of format_index or function
-        mutually_exclusive = [format_index, function]
-        if all(mutually_exclusive) or not any(mutually_exclusive):
-            log.error("Must specify exactly one of 'format_index' or 'function'.")
+        Note:
+
+            The easiest way to calculate ``stack_buffer_offset`` is to set a
+            breakpoint at the e.g. ``call printf`` instruction, and calculate
+            the difference between the stack pointer and the address of the
+            buffer on the stack.
+
+            Pwndbg_ makes this relatively easy, since it prints out the arguments
+            passed into functions.   Let's assume that the buffer
+            contents are "aaaabaaa" as is generated via :func:`cyclic`.
+
+            ::
+
+                > 0x8048b03 <main+726>    call   printf@plt
+                format: 0xffffcbb4 ◂— 'aaaabaaa'
+                ...
+                pwndbg> distance $esp 0xffffcbb4
+                0xffffcb20->0xffffcbb4 is 0x94 bytes (0x25 words)
+
+
+            If you are unaware of where your buffer lies, you can use the
+            ``search`` command to find it easily.
+
+            ::
+
+                pwndbg> search aaaabaaa
+                [heap]          0x804a168 'aaaabaaacaaadaa...'
+                [stack]         0xffffcb96 'aaaabaaacaaadaa...'
+                [stack]         0xffffcbb4 'aaaabaaa'
+
+        """
 
         # Determine our calling convention / dollar-argument model
         if isinstance(function, str):
             function = FormatFunction.registry.get(function, None)
 
-        if function is None:
-            if format_index is not None:
-                function = FormatFunction(format_index)
-            else:
-                function = printf
+        elif format_index:
+            function = FormatFunction(format_index)
+
+        elif not function:
+            function = printf
 
         #: Target function which is invkoed
         self.function = function
 
+        #: Number of bytes already written
+        self.already_written = already_written
+
         #: Whether the format string buffer itself is on the stack
-        self.on_stack = False
+        self.stack_buffer_offset = stack_buffer_offset
+
+        #: Size of the buffer on the stack
+        self.stack_buffer_size = stack_buffer_size
+
+        #: Size of the format string buffer
+        self.format_buffer_size = format_buffer_size
+
+        #: Size of writes
+        self.write_size = write_size
 
         #: Operand stack, of what is being performed
+        self.memory = {}
 
     @property
     def format_index(self):
@@ -101,18 +188,225 @@ class FormatString(object):
         return self.memory.get(index, None)
 
     def __setitem__(self, index, value):
-        if isinstance(value, int):
-            value = pack(value)
-
-        if not isinstance(value, (str, bytes)):
-            log.error("Data must be an integer (packed to default width) or a byte string")
-
-        for i, byte in enumerate(value):
+        for i, byte in enumerate(flat(value)):
             self.memory[index + i] = byte
 
     # ----- READ RELATED FUNCTIONS -----
     def leak(self, address):
         pass
+
+    # ----- FORMAT STRING CREATION -----
+    def __str__(self):
+        return self._generate()
+
+    def payload(self, *a, **kw):
+        """Included for compatibility with libformatstr"""
+        return self._generate()
+
+    def _generate(self):
+        """_generate(size=1) -> str
+
+        Generate the format string.
+        """
+
+        # Coalesce writes into chunks of write_size or smaller
+        write_sizes = []
+        while 1 not in write_sizes:
+            write_sizes.append(self.write_size >> len(write_sizes))
+
+        # Store the coalesced data in a new copy of memory
+        memory = self.memory.copy()
+
+        # Find repeated chunks of memory, which we can optimize
+        # to not emit twice.
+        # contiguous_memory = self.memory.copy()
+        # for address, byte in sorted(contiguous_memory.viewitems()):
+        #     run_size = 1
+        #     data = byte
+        #     while address + run_size in contiguous_memory:
+        #         contiguous_memory[address] += memory[address + run_size]
+        #         del contiguous_memory[address + run_size]
+        #         run_size += 1
+
+        # Create a frequency-ordered list of all memory chunks.
+        # Keys are the data, values are a list of addresses.
+        # The frequency of a sequence of bytes is len(freq[data])
+        #
+        # Note: We do not attempt to optimize single-byte writes.
+        #
+        # Consider that we might want to write the value
+        #
+        #       0x63616261 ("abac")
+        #
+        # If we frequency-optimize single-byte writes, we'll
+        # end up with four one-byte writes (since "a" is duplicated)
+        # instead of two one-byte writes.
+        #
+        # The benefit of doing this frequency analysis is that naive
+        # 2-byte chunking might perform a write like:
+        #
+        #       "ab" "bb" "b"
+        #
+        # However, the frequency analysis would allow us to perform:
+        #
+        #       "a" "bb" "bb"
+        #
+        # Which uses the same amount of space for *pointers*, but
+        # uses significantly less space for the format string itself,
+        # by re-using values.
+        freq_memory = collections.defaultdict(lambda: [])
+
+        for size in write_sizes:
+
+            if size == 1:
+                continue
+
+            for address, byte in memory.viewitems():
+
+                span = tuple(range(address, address+size))
+                if not all(a in memory for a in span):
+                    continue
+
+                chunk = ''.join(memory[a] for a in span)
+                freq_memory[chunk].append(address)
+
+        # Optimize against frequency, starting with the most frequent
+        def count(data):
+            return len(freq_memory[data])
+
+        for chunk, addresses in sorted(freq_memory, key=count):
+
+            for address in addresses:
+                # Did we already optimize this chunk?
+                span = tuple(range(address, address+len(chunk)))
+
+                if not all(a in memory for a in span):
+                    continue
+
+                # We did not already optimize it out, do so now
+                for a in span:
+                    del memory[a]
+
+                memory[a] = chunk
+
+        # Memory is now in an optimal state for size.
+        # Convert to integer values, instead of byte-strings.
+        #
+        # Subtract the number of bytes 'already written', and
+        # make the value unsigned.
+        int_memory = {}
+
+        for addr, data in memory.items():
+            size = len(data)
+            mask = (1 << (8*size)) - 1
+
+            value = pack(data, bytes=size)
+
+            value += self.already_written
+            value &= mask
+
+            int_memory[addr] = value
+
+        # Order writes such that we maximally use the increasing
+        # counter of the print function, given the number of bytes
+        # which have already been printed.
+        def value_order(k_v):
+            k,v = k_v
+            return v
+
+        ordered_writes = []
+
+        for addr, value in sorted(int_memory.items(), key=value_order):
+            ordered_writes.append(write(addr, value))
+
+        # We have now optimized and ordered our writes
+        #
+        # If our format string is in the same buffer as the stack buffer
+        # we are using to store our pointers, we need to calculate its size.
+        format_string = []
+        stack_buffer = []
+        counter = self.already_written
+
+        # Both glibc and macOS update the parameter index on a positional.
+        # This means that contrary to common implementation, there is no
+        # need to use a positional specifier after the first one.
+        positional = True
+
+        for addr, value in ordered_writes:
+            size = len(memory[addr])
+            fmt = ''
+
+            # If we need to adjust the value which will be written, do it
+            if value != counter:
+                fmt += '%{}c'.format(value-counter)
+                counter = value
+
+            # Actually write the value
+            if positional:
+                fmt += write_strings_positional[size]
+                positional = False
+            else:
+                fmt += write_positional[size]
+
+            # Save both
+            format_strings.append(fmt)
+            stack_buffer.append(addr)
+
+        # Put it all together, there should be a single positional placeholder
+        format_string = ''.join(format_strings)
+
+        format_buffer_size = self.format_buffer_size
+        stack_buffer_size = self.stack_buffer_size
+        stack_buffer_offset = self.stack_buffer_offset
+        padding = 0
+
+        # If the format buffer is "included" in the stack buffer, make adjustments
+        if not format_buffer_size:
+            fmt_len = len(format_string)
+
+            # Set the format buffer size to be the size of the overall buffer
+            format_buffer_size = min(fmt_len, stack_buffer_size)
+
+            # Adjust the amount of remaining data
+            stack_buffer_size -= fmt_len
+            stack_buffer_offset += fmt_len
+
+
+        # Adjust the stack buffer to be 4-byte aligned
+        slack = stack_buffer_offset % context.bytes
+        if slack:
+            stack_buffer.insert(0, 'X' * slack)
+            stack_buffer_offset += slack
+
+        # Calculate the offset for the positional argument
+        stack_buffer_index = self.stack_index
+        stack_buffer_index += (stack_buffer_offset // context.bytes)
+
+        # Don't support more than 99 right now, because lazy
+        if stack_buffer_index > 99:
+            log.error("Argument offset is too high (%i). Max is 99." % stack_buffer_index)
+
+        # Update the positional argument in the format string.
+        # If the positional index is <10, we need to pad it with
+        # a leading zero.
+        #
+        # XXX: This is a single-byte inefficiency that can be fixed.
+        index_str = "%02i" % str(stack_buffer_index)
+
+        # Get our format string and stack data! Woot!
+        format_string = format_string.format(index_str)
+        stack_data = flat(stack_buffer)
+
+        # Perform final size checks
+        if format_buffer_size < len(format_string):
+            log.error("Cannot fit the format string in %i bytes.\n%r" % (format_buffer_size,
+                                                                         len(format_string)))
+
+        if stack_buffer_size < len(stack_data):
+            log.error("Cannot fit the stack data in %i bytes.  Need %i.\n"
+                        % (stack_buffer_size, len(stack_data)))
+
+        return format_string, stack_data
 
 class AutomaticDiscoveryProcess(process):
     def __init__(self, argv, remote=True, size=None, **kw):
