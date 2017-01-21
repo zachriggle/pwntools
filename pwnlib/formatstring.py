@@ -269,7 +269,7 @@ class FormatString(object):
 
             length += 1
 
-        if not address or length == 0 or length < len(stack_data / 2):
+        if not address or length == 0 or length < len(stack_data) / 2:
             log.error("Could not find a suitable stack address")
 
         offset = stack_pointer - address
