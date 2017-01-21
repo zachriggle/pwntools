@@ -68,19 +68,19 @@ class FormatFunction(object):
                                self.name)
 
 # First argument
-printf   = FormatFunction(1, 'printf')
-scanf    = FormatFunction(1, 'scanf')
+printf   = FormatFunction(0, 'printf')
+scanf    = FormatFunction(0, 'scanf')
 
 # Second argument
-dprintf  = FormatFunction(2, 'dprintf')
-sprintf  = FormatFunction(2, 'sprintf')
-fprintf  = FormatFunction(2, 'fprintf')
-asprintf = FormatFunction(2, 'asprintf')
-fscanf   = FormatFunction(2, 'fscanf')
-sscanf   = FormatFunction(2, 'sscanf')
+dprintf  = FormatFunction(1, 'dprintf')
+sprintf  = FormatFunction(1, 'sprintf')
+fprintf  = FormatFunction(1, 'fprintf')
+asprintf = FormatFunction(1, 'asprintf')
+fscanf   = FormatFunction(1, 'fscanf')
+sscanf   = FormatFunction(1, 'sscanf')
 
 # Third argument
-snprintf = FormatFunction(3, 'snprintf')
+snprintf = FormatFunction(2, 'snprintf')
 
 class FormatString(object):
     def __init__(self,
