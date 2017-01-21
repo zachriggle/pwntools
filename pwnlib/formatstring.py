@@ -217,6 +217,58 @@ class FormatString(object):
     def stack_index(self):
         return self.function.stack_index
 
+    @classmethod
+    def from_corefile(clazz, corefile, stack_data, format_string=''):
+        """from_corefile(corefile) -> FormatString
+
+        Given a corefile, extract all of the relevant data for
+        format-string exploitation.
+
+        The program state from the corefile must be set up such that:
+
+        1. The process is stopped at the first instruction of the print
+           function.
+        2. The stack buffer we control is filled with the data ``stack_data``.
+        3. The format string, if separate from the stack buffer, is filled with
+           the data ``format_string``.
+
+        The available buffer sizes are inferred directly from the provided
+        parameters.
+
+        Arguments:
+            corefile(Corefile): :class:`Corefile` object to process
+            stack_data(str): Controlled data on the stack.  The length
+                of this string is used to determine the stack buffer size.
+                The contents of this string are used to search the corefile,
+                to determine stack offsets.
+            format_string(str): Controlled format string, if not on the
+                stack as part of stack_data.  Only the length of this string
+                is used.
+
+        Returns:
+
+            :class:`Corefile`: A corefile object
+        """
+
+        stack_addresses = sorted(list(corefile.search(stack_data)))
+        stack_pointer = corefile.sp
+
+        if len(stack_addresses) == 0:
+            log.error("Could not find stack data %r anywhere in memory" % stack_data)
+
+        # The data must be on the stack, and at a lower address than sp
+        for address in stack_addresses:
+            if address < stack_pointer:
+                log.info("Found data on stack at %#x" % address)
+                break
+        else:
+            log.error("Could not find a suitable stack address")
+
+        return FormatString(stack_buffer_offset=stack_pointer - address,
+                            stack_buffer_size=len(stack-data),
+                            format_buffer_size = len(format_string))
+
+
     # ----- WRITE RELATED FUNCTIONS -----
     def __contains__(self, index):
         return index in self.memory
@@ -484,3 +536,4 @@ class AutomaticDiscoveryProcess(process):
             String printed by the function, or ``None``.
         """
         raise NotImplementedError('Must subclass and implement submit')
+
