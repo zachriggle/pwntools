@@ -538,7 +538,7 @@ class FormatString(object):
             log.error("Cannot fit the stack data in %i bytes.  Need %i.\n"
                         % (stack_buffer_size, len(stack_data)))
 
-        return format_string, stack_data
+        return format_string, stack_data, ordered_writes
 
     def dump(self):
         rv = []
