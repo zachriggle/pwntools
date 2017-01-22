@@ -507,6 +507,8 @@ class Corefile(ELF):
                     # off the end of the stack.
                     pass
 
+            self._describe_core()
+
     def _parse_nt_file(self, note):
         t = tube()
         t.unrecv(note.n_desc)
@@ -589,6 +591,10 @@ class Corefile(ELF):
         """:class:`Mapping`: First mapping for the executable file."""
         for m in self.mappings:
             if self.at_entry and m.start <= self.at_entry <= m.stop:
+
+                if not m.name and self.at_execfn:
+                    m.name = self.string(self.at_execfn)
+
                 return m
 
     @property
@@ -617,6 +623,63 @@ class Corefile(ELF):
             SIGILL, SIGFPE, SIGSEGV, SIGBUS."""
         if self.siginfo:
             return int(self.siginfo.sigfault_addr)
+
+    @property
+    def _pc_register(self):
+        name = {
+            'i386': 'eip',
+            'amd64': 'rip',
+        }.get(self.arch, 'pc')
+        return name
+
+    @property
+    def pc(self):
+        """:class:`int`: The program counter for the Corefile
+
+        This is a cross-platform way to get e.g. ``core.eip``, ``core.rip``, etc.
+        """
+        return self.registers.get(self._pc_register, None)
+
+    @property
+    def _sp_register(self):
+        name = {
+            'i386': 'esp',
+            'amd64': 'rsp',
+        }.get(self.arch, 'sp')
+        return name
+
+    @property
+    def sp(self):
+        """:class:`int`: The program counter for the Corefile
+
+        This is a cross-platform way to get e.g. ``core.esp``, ``core.rsp``, etc.
+        """
+        return self.registers.get(self._sp_register, None)
+
+    def _describe(self):
+        pass
+
+    def _describe_core(self):
+        gnu_triplet = '-'.join(map(str, (self.arch, self.bits, self.endian)))
+
+        fields = [
+            repr(self.path),
+            '%-10s %s' % ('Arch:', gnu_triplet),
+            '%-10s %#x' % ('%s:' % self._pc_register.upper(), self.pc),
+            '%-10s %#x' % ('%s:' % self._sp_register.upper(), self.sp),
+        ]
+
+        if self.exe and self.exe.name:
+            fields += [
+                '%-10s %s' % ('Exe:', '%r (%#x)' % (self.exe.name, self.exe.address))
+            ]
+
+        if self.fault_addr:
+            fields += [
+                '%-10s %s' % ('Fault:', self.fault_addr)
+            ]
+
+        log.info_once('\n'.join(fields))
 
     def _load_mappings(self):
         for s in self.segments:
