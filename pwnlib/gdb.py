@@ -638,7 +638,8 @@ def attach(target, gdbscript = None, exe = None, need_ptrace_scope = True, gdb_a
     if not pid and not exe:
         log.error('could not find target process')
 
-    gdbscript = 'file %s\n%s' % (exe, gdbscript)
+    if not context.native:
+        gdbscript = 'file %s\n%s' % (exe, gdbscript)
 
     cmd = binary()
 
