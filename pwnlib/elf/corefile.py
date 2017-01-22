@@ -432,6 +432,9 @@ class Corefile(ELF):
         # Pointer to the executable filename on the stack
         self.at_execfn = 0
 
+        # Pointer to the entry point
+        self.at_entry = 0
+
         try:
             super(Corefile, self).__init__(*a, **kw)
         except IOError:
