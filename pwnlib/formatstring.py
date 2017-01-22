@@ -59,8 +59,19 @@ class FormatFunction(object):
 
         This varies by function, depending on the architecture.
         """
-        abi   = ABI.default()
-        return max(0, len(abi.register_arguments) - self.format_index)
+        register_arguments = ABI.default().register_arguments
+
+        # If there are *no* register arguments, like for i386,
+        # the index of the first value on the stack is increased
+        # by one, because glibc is retarded.
+        format_index = self.format_index
+
+        if register_arguments:
+            format_index += register_arguments
+        else:
+            format_index -= 1
+
+        return max(0, format_index)
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__,
@@ -68,19 +79,19 @@ class FormatFunction(object):
                                self.name)
 
 # First argument
-printf   = FormatFunction(0, 'printf')
-scanf    = FormatFunction(0, 'scanf')
+printf   = FormatFunction(1, 'printf')
+scanf    = FormatFunction(1, 'scanf')
 
 # Second argument
-dprintf  = FormatFunction(1, 'dprintf')
-sprintf  = FormatFunction(1, 'sprintf')
-fprintf  = FormatFunction(1, 'fprintf')
-asprintf = FormatFunction(1, 'asprintf')
-fscanf   = FormatFunction(1, 'fscanf')
-sscanf   = FormatFunction(1, 'sscanf')
+dprintf  = FormatFunction(2, 'dprintf')
+sprintf  = FormatFunction(2, 'sprintf')
+fprintf  = FormatFunction(2, 'fprintf')
+asprintf = FormatFunction(2, 'asprintf')
+fscanf   = FormatFunction(2, 'fscanf')
+sscanf   = FormatFunction(2, 'sscanf')
 
 # Third argument
-snprintf = FormatFunction(2, 'snprintf')
+snprintf = FormatFunction(3, 'snprintf')
 
 class FormatString(object):
     def __init__(self,
