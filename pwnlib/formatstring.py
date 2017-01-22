@@ -67,7 +67,7 @@ class FormatFunction(object):
         format_index = self.format_index
 
         if register_arguments:
-            format_index += len(register_arguments)
+            format_index += len(register_arguments) - 1
         else:
             format_index -= 1
 
