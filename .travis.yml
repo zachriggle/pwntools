@@ -23,10 +23,8 @@ cache:
 python:
   - "2.7"
 before_install:
-  - set -ex
   - source travis/install.sh
   - source travis/ssh_setup.sh
-  - set +ex
 install:
   - pip install --upgrade pip
   - pip install --upgrade --editable .
