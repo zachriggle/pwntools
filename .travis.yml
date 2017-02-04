@@ -41,4 +41,3 @@ script:
 after_success:
   - coveralls
   - source travis/update_demo.sh
-  - true
