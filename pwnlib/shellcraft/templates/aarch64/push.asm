@@ -1,21 +1,26 @@
 <%
-  from pwnlib.util import packing
-  from pwnlib.shellcraft import i386
-  from pwnlib import constants
-  from pwnlib.shellcraft.registers import get_register, is_register, bits_required
-  import re
+    from pwnlib import shellcraft
+    from pwnlib.util.packing import flat, unpack
+    from pwnlib.util.iters import group
 %>
-<%page args="value"/>
+<%page args="value, register1='x14', register2='x15'"/>
 <%docstring>
 Pushes a value onto the stack without using null bytes or newline characters.
 
-If src is a string, then we try to evaluate with `context.arch = 'i386'` using
-:func:`pwnlib.constants.eval` before determining how to push it. Note that this
-means that this shellcode can change behavior depending on the value of
-`context.os`.
+If src is a string, then we try to evaluate using :func:`pwnlib.constants.eval`
+before determining how to push it.
+
+Note that this means that this shellcode can change behavior depending on
+the value of `context.os`.
+
+Note:
+    AArch64 requires that the stack remain 16-byte aligned at all times,
+    so this alignment is preserved.
 
 Args:
-  value (int,str): The value or register to push
+    value(int,str): The value or register to push
+    register1(str): Scratch register to use
+    register2(str): Second scratch register to use
 
 Example:
 
@@ -42,20 +47,4 @@ Example:
         /* push (SYS_execve) (0x3b) */
         push 0x3b
 </%docstring>
-
-<%
-value_orig = value
-is_reg = get_register(value)
-
-if not is_reg and isinstance(value, (str, unicode)):
-    try:
-        value = constants.eval(value)
-    except (ValueError, AttributeError):
-        pass
-%>
-
-% if is_reg:
-    push ${value}
-% else:
-    ${i386.pushstr(value, False)}
-% endif
+    ${shellcraft.pushstr(flat(value), register1=register1, register2=register2)}
