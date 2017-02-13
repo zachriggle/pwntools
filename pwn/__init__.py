@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from pwn.toplevel import *
 
 pwnlib.args.initialize()
+pwnlib.config.initialize()
 pwnlib.log.install_default_handler()
 
 log = pwnlib.log.getLogger('pwnlib.exploit')
