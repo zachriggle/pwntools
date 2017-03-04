@@ -179,6 +179,43 @@ class Mapping(object):
                         'w' if flags & 2 else '-',
                         'x' if flags & 1 else '-',
                         'p'])
+
+    @property
+    def elf(self):
+        """:class:`.ELF`: Loads the ELF object for this mapping"""
+        if not self.path or not os.path.isfile(self.path):
+            return None
+        # io = ELF.from_assembly(shellcraft.crash()).process()
+        mappings = [m for m in self._core.mappings if m.path == self.path]
+        first = min(mappings)
+
+        # Load the ELF off disk
+        try:
+            elf = ELF(self.path)
+        except Exception:
+            log.exception("Could not load ELF %r for mapping %r", self.path, self)
+            return None
+
+        # Try the GNU Build ID first, since that's easiest
+        buildid = elf.buildid
+        if buildid and any(buildid in m for m in mappings):
+            return elf
+
+        # Try the ELF headers to see if the mappings match
+        addresses = [m.address for m in mappings]
+        sizes = [m.size for m in mappings]
+
+        for seg in self._core.iter_segments_by_type('PT_LOAD'):
+            addr = seg.header.p_vaddr
+            size = seg.header.p_memsz
+
+            if not elf.pie and addr not in addresses:
+                log.error("Could not find mapping for %#x", addr)
+            elif elf.pie and size not in sizes:
+                log.error("Could not find mapping for %#x", addr)
+
+        return elf
+
     def __str__(self):
         return '%x-%x %s %x %s' % (self.start,self.stop,self.permstr,self.size,self.name)
 
@@ -223,7 +260,10 @@ class Mapping(object):
         return self._core.read(item, 1)
 
     def __contains__(self, item):
-        return self.start <= item < self.stop
+        if isinstance(item, int):
+            return self.start <= item < self.stop
+        elif isinstance(item, str):
+            return item in self.data
 
     def find(self, sub, start=None, end=None):
         """Similar to str.find() but works on our address space"""
@@ -433,7 +473,7 @@ class Corefile(ELF):
 
     _fill_gaps = False
 
-    def __init__(self, *a, **kw):
+    def __init__(self, path, process, *a, **kw):
         #: The NT_PRSTATUS object.
         self.prstatus = None
 
@@ -469,7 +509,7 @@ class Corefile(ELF):
         self.at_entry = 0
 
         try:
-            super(Corefile, self).__init__(*a, **kw)
+            super(Corefile, self).__init__(path, *a, **kw)
         except IOError:
             log.warning("No corefile.  Have you set /proc/sys/kernel/core_pattern?")
             raise
