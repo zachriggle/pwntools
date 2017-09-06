@@ -12,7 +12,7 @@ script:
   - sudo cat /etc/sudoers
   - ls -la $(which sudo)
   - which docker
-  - docker ps
+  - sudo docker ps -a
   - sudo find / -group docker
   - sudo -K
   - sudo whoami
