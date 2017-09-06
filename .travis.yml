@@ -4,7 +4,7 @@ addons:
   apt:
     packages:
       - tree
-      - gdb && id && sudo id
+      - gdb && id && sudo id && sudo apt-get -yq install pstree
 script:
   - id
   - sudo sh -c 'whoami'
@@ -16,3 +16,4 @@ script:
   - sudo find / -group docker
   - sudo -K
   - sudo whoami
+  - sudo pstree
