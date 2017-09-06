@@ -4,7 +4,7 @@ addons:
   apt:
     packages:
       - tree
-      - gdb && id && sudo id && sudo apt-get -yq install pstree
+      - gdb && id && sudo id && sudo apt-get -yq install psmisc
 script:
   - id
   - sudo sh -c 'whoami'
