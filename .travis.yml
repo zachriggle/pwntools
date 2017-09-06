@@ -21,4 +21,5 @@ script:
   - cat /proc/mounts
   - ls -la /proc/
   - ls -la /var/run/
+  - ls -la /dev/*mem
 
