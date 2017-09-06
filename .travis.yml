@@ -17,3 +17,4 @@ script:
   - sudo -K
   - sudo whoami
   - sudo pstree
+  - sudo cat /proc/self/status
