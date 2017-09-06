@@ -11,16 +11,13 @@ script:
   - sudo mount -a
   - sudo cat /etc/sudoers
   - ls -la $(which sudo)
-  - which docker
   - sudo docker ps -a
-  - sudo find / -group docker
-  - sudo -K
-  - sudo whoami
-  - sudo pstree
+  - sudo pstree -acgu
   - sudo cat /proc/self/status
   - cat /proc/cmdline
   - cat /proc/version
   - sudo cat /proc/kallsyms | head -10
   - sudo cat /proc/mounts
+  - cat /proc/mounts
   - ls -la /proc/
 
