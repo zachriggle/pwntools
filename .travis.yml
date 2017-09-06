@@ -6,3 +6,4 @@ addons:
       - gdb && id && sudo id
 script:
   - id
+  - sudo id
