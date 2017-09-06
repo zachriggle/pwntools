@@ -2,4 +2,4 @@ dist: trusty
 sudo: false
 language: python
 script:
-  - sudo id
+  - uptime
