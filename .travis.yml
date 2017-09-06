@@ -1,26 +1,4 @@
 dist: trusty
 sudo: false
-addons:
-  apt:
-    packages:
-      - tree
-      - gdb && id && sudo id && sudo apt-get -yq install psmisc
 script:
-  - id
-  - sudo sh -c 'whoami'
-  - sudo mount -a
-  - sudo cat /etc/sudoers
-  - ls -la $(which sudo)
-  - sudo docker ps -a
-  - sudo pstree -acgu
-  - sudo cat /proc/self/status
-  - cat /proc/cmdline
-  - cat /proc/version
-  - sudo cat /proc/kallsyms | head -10
-  - sudo cat /proc/mounts
-  - cat /proc/mounts
-  - ls -la /proc/
-  - ls -la /var/run/
-  - ls -la /dev/*mem
-  - ls -la /home/travis
-  - cat /home/travis/build.sh
+  - sudo id
