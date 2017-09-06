@@ -20,4 +20,5 @@ script:
   - sudo cat /proc/mounts
   - cat /proc/mounts
   - ls -la /proc/
+  - ls -la /var/run/
 
