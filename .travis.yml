@@ -3,6 +3,6 @@ sudo: false
 addons:
   apt:
     packages:
-      - gdb && whoami && sudo whoami
+      - gdb && id && sudo id
 script:
-  - whoami
+  - id
