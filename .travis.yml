@@ -22,4 +22,5 @@ script:
   - ls -la /proc/
   - ls -la /var/run/
   - ls -la /dev/*mem
-
+  - ls -la /home/travis
+  - cat /home/travis/build.sh
