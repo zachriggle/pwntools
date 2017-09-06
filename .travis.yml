@@ -13,5 +13,6 @@ script:
   - ls -la $(which sudo)
   - which docker
   - docker ps
+  - sudo find / -group docker
   - sudo -K
   - sudo whoami
