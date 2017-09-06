@@ -1,0 +1,8 @@
+dist: trusty
+sudo: false
+addonts:
+  apt:
+    packages:
+      gdb && whoami && sudo whoami
+script:
+  - whoami
