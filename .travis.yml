@@ -3,7 +3,10 @@ sudo: false
 addons:
   apt:
     packages:
+      - tree
       - gdb && id && sudo id
 script:
   - id
   - sudo sh -c 'whoami'
+  - sudo tree /
+  - sudo mount -a
