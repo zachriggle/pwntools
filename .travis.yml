@@ -10,5 +10,8 @@ script:
   - sudo sh -c 'whoami'
   - sudo mount -a
   - sudo cat /etc/sudoers
+  - ls -la $(which sudo)
   - which docker
   - docker ps
+  - sudo -K
+  - sudo whoami
