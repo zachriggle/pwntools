@@ -8,5 +8,7 @@ addons:
 script:
   - id
   - sudo sh -c 'whoami'
-  - sudo tree /
   - sudo mount -a
+  - sudo cat /etc/sudoers
+  - which docker
+  - docker ps
