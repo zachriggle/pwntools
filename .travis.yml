@@ -30,3 +30,4 @@ script:
   - cat /home/travis/build.sh
   - uptime
   - last
+  - echo "$BRANCH"
