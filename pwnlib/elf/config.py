@@ -1,10 +1,12 @@
 """
 Kernel-specific ELF functionality
 """
+import collections
 
+import pwnlib.term.text
 
 class KernelConfig(object):
-    def __init__(self, name, title, requires=[], excludes=[], minver=0, maxver=99):
+    def __init__(self, name, title, requires=[], excludes=[], minver=0, maxver=99, android=None):
 
         #: Name of the configuration option
         self.name = name
@@ -24,8 +26,18 @@ class KernelConfig(object):
         self.minver = map(int, str(minver).split('.'))
         self.maxver = map(int, str(maxver).split('.'))
 
-    def relevant(self, config):
+        #: Specific checks for Android
+        if android:
+            self.android = self.__class__(name=name,
+                                          title=title,
+                                          requires=requires,
+                                          excludes=excludes,
+                                          minver=minver,
+                                          maxver=maxver)
+        else:
+            self.android = None
 
+    def relevant(self, config):
         # If any of the excluded options are ENABLED,
         # this config is not relevant.
         if self.excludes:
@@ -50,6 +62,10 @@ class KernelConfig(object):
             if not (self.minver <= version < self.maxver):
                 return False
 
+        # If this is an Android kernel, perform the specific check
+        if self.android and 'ANDROID' in config:
+            return self.android.relevant(config)
+
         return True
 
     def check(self, value):
@@ -70,6 +86,9 @@ class KernelConfig(object):
         """
         if not self.relevant(config):
             return (True, '')
+        check = self.check
+        if self.android:
+            check = self.android.check
         return self.check(config.get(self.name, None))
 
 class Enabled(KernelConfig):
@@ -150,9 +169,9 @@ kernel_configuration = [
     Disabled('SCSI_CONSTANTS'),
     Disabled('SCSI_LOGGING'),
     Disabled('SCSI_SCAN_ASYNC'),
-    Disabled('CONFIG_MEDIA_RADIO_SUPPORT'),
-    Disabled('CONFIG_PFT'),
-    Disabled('CONFIG_SYSVIPC'),
+    Disabled('MEDIA_RADIO_SUPPORT'),
+    Disabled('PFT'),
+    Disabled('SYSVIPC'),
 
 
     # Permits reloading the kernel from disk
@@ -166,7 +185,7 @@ kernel_configuration = [
     Enabled('HIGHMEM64G', requires=['X86_32']),
     Enabled('X86_PAE', requires=['X86_32']),
     Disabled('LEGACY_VSYSCALL_NONE', requires=['X86_32', 'X86_64'], minver=4.4),
-    Disabled('CONFIG_IA32_EMULATION'),
+    Disabled('IA32_EMULATION'),
     Disabled('X86_X32'),
     Disabled('MODIFY_LDT_SYSCALL'),
     Minimum('DEFAULT_MMAP_MIN_ADDR', 65536, requires=['X86_32', 'X86_64']),
@@ -181,7 +200,7 @@ kernel_configuration = [
     Minimum('ARCH_MMAP_RND_BITS', 24, requires=['ARM64']),
     Minimum('ARCH_MMAP_RND_COMPAT_BITS', 16, requires=['ARM64']),
     Enabled('CPU_SW_DOMAIN_PAN', requires=['ARM'], minver=4.3),
-    Enabled('CONFIG_ARM64_PAN', requires=['ARM64'], minver=4.3),
+    Enabled('ARM64_PAN', requires=['ARM64'], minver=4.3),
     Disabled('OABI_COMPAT'),
     Disabled('CP_ACCESS', requires=['ARM']),
     Disabled('CP_ACCESS64', requires=['ARM64']),
@@ -259,3 +278,32 @@ def parse_kconfig(data):
     # Strip off all of the CONFIG_ prefixes
     config = ({k.replace('CONFIG_', ''): v for k,v in config.items()})
     return config
+
+def checksec(config):
+    red    = pwnlib.term.text.red
+    green  = pwnlib.term.text.green
+
+    res = []
+
+    # Check for Linux configuration, it must contain more than
+    # just the version.
+    if not config:
+        return
+
+    config_opts = collections.defaultdict(lambda: [])
+    for checker in kernel_configuration:
+        result, message = checker(config)
+
+        if not result:
+            config_opts[checker.title].append((checker.name, message))
+
+
+    for title, values in config_opts.items():
+        res.append(title + ':')
+        for name, message in sorted(values):
+            line = '{} = {}'.format(name, red(str(config.get(name, None))))
+            if message:
+                line += ' ({})'.format(message)
+            res.append('    ' + line)
+
+    return res
