@@ -1143,6 +1143,108 @@ class ROP(object):
             leave = None
         self.leave = leave
 
+    def __load_amd64_libc_csu_init_gadget(self):
+        """Manually adds logic for the __libc_csu_init gadget
+
+        This gadget is present on many Linux binaries, and is useful for
+        getting control of unusual registers.
+
+        There are two parts to the gadget, which we don't find automatically
+        because:
+
+        1. It uses instructions we don't support (i.e. "mov REG, [rsp+OFFSET]")
+        2. The instruction sequence is deeper than we search with ROPgadget
+           (35 bytes vs 10 bytes)
+
+        The first sequence is:
+
+            48 8B 5C 24 08                          mov     rbx, [rsp+8]
+            48 8B 6C 24 10                          mov     rbp, [rsp+10h]
+            4C 8B 64 24 18                          mov     r12, [rsp+18h]
+            4C 8B 6C 24 20                          mov     r13, [rsp+20h]
+            4C 8B 74 24 28                          mov     r14, [rsp+28h]
+            4C 8B 7C 24 30                          mov     r15, [rsp+30h]
+            48 83 C4 38                             add     rsp, 38h
+            C3                                      retn
+
+        We may not want control of those registers, but RDI, RSI, and RDX are also
+        generally desirable, as they are the first three arguments on amd64.
+
+        The second sequence achieves this:
+
+            4C 89 FA                                mov     rdx, r15
+            4C 89 F6                                mov     rsi, r14
+            44 89 EF                                mov     edi, r13d
+            41 FF 14 DC                             call    qword ptr [r12+rbx*8]
+
+        Note that we don't technically have control of RDI, only EDI, but this can
+        be worked around.
+        """
+
+        if self.elfs[0].arch != 'amd64':
+            continue
+
+        sequences = [
+            unhex('488B5C2408488B6C24104C8B6424184C8B6C24204C8B7424284C8B7C24304883C438C3'),
+            unhex('4C89FA4C89F64489EF41FF14DC')
+        ]
+
+        addresses = {}
+
+        # Find a good candidate address for each sequence
+        for sequence in sequences:
+            for elf in self.elfs:
+                for address in elf.search(sequence):
+                    # Don't pick bad addresses
+                    if set(pack(address)) & self._badchars:
+                        continue
+
+                    addresses[sequence] = address
+                    break
+
+                if sequence in addresses:
+                    break
+
+        # The first sequence is pretty easy, and can be "faked" to
+        # represent instructions which we would normally deal with.
+        addr = addresses.get(sequences[0])
+
+        if addr is None:
+            return
+
+        # Note we're writing these as "pop" even though the instructions
+        # are *REALLY ACTUALLY* just "mov reg" instructions.
+        #
+        # We do this because the "first" register to get "popped" off the
+        # stack is at indexd +8, and we can't really handle that well in
+        # some other places.
+        #
+        # In order to circumvent this, we "fake" popping RBX twice, and
+        # everything else just kind of lines up correctly.
+        insns = [
+            'pop rbx', # 0x08,
+            'pop rbx', # 0x10
+            'pop rbp', # 0x18
+            'pop r12', # 0x20
+            'pop r13', # 0x28
+            'pop r14', # 0x30
+            'pop r15', # 0x38
+            'ret'
+        ]
+
+        regs = ['rbx', 'rbx', 'rbp', 'r12', 'r13', 'r14', 'r15']
+
+        mov = 0x38 + 8
+
+        g = Gadget(addr, insns, regs, move)
+
+        self.gadgets[addr] = g
+
+        # Next, in order to set EDI / RSI / RDX, we do the same thing.
+
+
+
+
     def __repr__(self):
         return 'ROP(%r)' % self.elfs
 

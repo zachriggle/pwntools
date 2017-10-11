@@ -45,6 +45,11 @@ class Gadget(object):
 
     __indices = ['address', 'details']
 
+    def can_set_register(self, reg, value):
+        """This is used in a specific case to handle AMD64 gadgets which set
+        32-bit registers instead of 64-bit registers."""
+        return True
+
     def __repr__(self):
         return "%s(%#x, %r, %r, %#x)" % (self.__class__.__name__,
                                          self.address,
