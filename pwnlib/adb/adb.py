@@ -62,6 +62,7 @@ import dateutil.parser
 
 from pwnlib import atexit
 from pwnlib import tubes
+from pwnlib.adb.bootloader import BootloaderImage
 from pwnlib.context import LocalContext
 from pwnlib.context import context
 from pwnlib.device import Device
@@ -172,6 +173,9 @@ def no_emulator(f):
 @with_device
 def reboot(wait=True):
     """Reboots the device.
+
+    Arguments:
+        wait(bool): Wait for the device to show up in ADB.
     """
     log.info('Rebooting device %s' % context.device)
 
@@ -183,13 +187,26 @@ def reboot(wait=True):
 
 @no_emulator
 @with_device
-def reboot_bootloader():
+def reboot_bootloader(wait=True):
     """Reboots the device to the bootloader.
+
+    Arguments:
+        wait(bool): Wait for the device to show up in fastboot.
     """
     log.info('Rebooting %s to bootloader' % context.device)
 
     with AdbClient() as c:
         c.reboot_bootloader()
+
+    # Wait for the device to show up in the bootloader
+    while wait and not check_bootloader():
+        time.sleep(0.5)
+
+@no_emulator
+@with_device
+def check_bootloader():
+    """Check to see if the device is in fastboot mode"""
+    return context.device in fastboot(['devices',' -l'])
 
 @with_device
 def uptime():
@@ -974,15 +991,72 @@ def build():
 
 @with_device
 @no_emulator
-def unlock_bootloader():
+@context.quietfunc
+def unlock_bootloader(reboot=True):
     """Unlocks the bootloader of the device.
 
+    Arguments:
+        reboot(bool): Reboot the device after unlocking.
+            If ``False``, the device will be in the bootloader.
+
     Note:
-        This requires physical interaction with the device.
+        This requires physical interaction with the device, unless the
+        device is already unlocked.
     """
-    AdbClient().reboot_bootloader()
-    fastboot(['oem', 'unlock'])
-    fastboot(['continue'])
+    with log.waitfor("Unlocking bootloader on %s" % context.device):
+
+        # If the device is already in the bootloader, we can't check properties.
+        if not check_bootloader():
+
+            supported = str(properties.ro.oem_unlock_supported)
+
+            if supported == '0':
+                log.error("%r does not not support unlocking [ro.oem_unlock_supported = %r]",
+                           context.device, supported)
+
+            verifiedbootstate = str(properties.ro.boot.verifiedbootstate)
+            unlocked = (verifiedbootstate == 'orange')
+
+            if unlocked:
+                # We don't need to unlock the device, but the caller expects that
+                # the device will be in the bootloader when we return.
+                #
+                # The "fast" path is when somebody just wants to unlock the bootloader
+                # and is already in ADB mode.  We can avoid the bootloader entirely.
+                if not reboot:
+                    reboot_bootloader()
+                return
+
+            # Reboot to the bootloader so that we can do the unlock
+            reboot_bootloader()
+
+        # Check to see if the bootloader thinks it's unlocked.
+        unlocked = ('unlocked: yes' in fastboot(['getvar', 'unlocked']))
+        if unlocked:
+            if reboot:
+                fastboot(['reboot'])
+            return
+
+        # We need to unlock the device.
+        # Let's figure out which command is used for unlocking the bootloader.
+        # Older devices use "oem unlock", while newer devices use "flashing unlock".
+        # We can use the get_unlock_ability command to determine which one works.
+        for command in ['oem', 'flashing']:
+            response = fastboot([command, 'get_unlock_ability'])
+            if "remote: unknown command" not in response:
+                break
+
+        # Actually perform the unlock
+        response = fastboot([command, 'unlock'])
+
+        # If the user wants the device back in ADB, reboot to Android
+        if reboot:
+            fastboot(['reboot'])
+
+        # Inform of any failures
+        if 'not allowed' in response:
+            log.error("Unlocking is not allowed")
+
 
 class Kernel(object):
     _kallsyms = None
@@ -1048,10 +1122,13 @@ class Kernel(object):
             'Nexus 5X': None,
             'Nexus 6P': 'oem uart enable',
             'Nexus 7': 'oem uart-on',
+            'Pixel': 'oem uart enable',
+            'Pixel XL': 'oem uart enable',
+            'Pixel 2': 'oem uart enable',
+            'Pixel 2 XL': 'oem uart enable',
         }
 
         with log.waitfor('Enabling kernel UART') as w:
-
             if model not in known_commands:
                 log.error("Device UART is unsupported.")
 
@@ -1071,13 +1148,8 @@ class Kernel(object):
                 # Save off the command line before rebooting to the bootloader
                 cmdline = kernel.cmdline
 
-                reboot_bootloader()
-
-                # Wait for device to come online
-                while context.device not in fastboot(['devices',' -l']):
-                    time.sleep(0.5)
-
-                # Try the 'new' way
+                # Unlock the device
+                unlock_bootloader(reboot=False)
                 fastboot(command.split())
                 fastboot(['continue'])
                 wait_for_device()
@@ -1091,6 +1163,9 @@ class Property(object):
 
     def __str__(self):
         return getprop(self._name).strip()
+
+    def __int__(self):
+        return int(str(self))
 
     def __repr__(self):
         return repr(str(self))
