@@ -1,4 +1,5 @@
-dist: precise
+dist: trusty
+sudo: false
 language: python
 addons:
   apt:
@@ -37,7 +38,7 @@ before_script:
   - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
   - PWNLIB_NOTERM=1 python -c 'from pwn import *; print pwnlib.term.term_mode'
 script:
-  - PWNLIB_NOTERM=1 coverage run -m sphinx -b doctest docs/source docs/build/doctest
+  - PWNLIB_NOTERM=1 strace -yy -e execve,execveat coverage run -m sphinx -b doctest docs/source docs/build/doctest
 after_success:
   - coveralls
   - source travis/update_demo.sh
