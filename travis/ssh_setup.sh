@@ -40,7 +40,7 @@ pubkey=$(cat ~/.ssh/$U.pub)
 # and only with
 USUDO mkdir $H/.ssh || true
 USUDO tee -a $H/.ssh/authorized_keys <<EOF
-from="127.0.0.1" $pubkey
+$pubkey
 EOF
 
 # In the pwntools examples, we ssh to 'example.pwnme'
