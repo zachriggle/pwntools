@@ -53,6 +53,7 @@ Host example.pwnme
     IdentityFile ~/.ssh/$U
 EOF
 
-ssh -o "StrictHostKeyChecking no" -vvvv travis@example.pwnme id
+dmesg
+ssh -o "StrictHostKeyChecking no" -vvvv travis@example.pwnme id || dmesg
 
 set +ex
