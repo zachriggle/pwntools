@@ -31,12 +31,9 @@ setup_travis()
     # Install/upgrade qemu
     [[ -f usr/bin/qemu-arm-static ]] || install_deb qemu-user-static
 
-    # # Install cross-binutils
-    # [[ -f usr/bin/x86_64-linux-gnu-ar ]]    || install_deb binutils-multiarch
-    # [[ -f usr/bin/aarch64-linux-gnu-as ]]   || install_deb binutils-aarch64-linux-gnu
-    # [[ -f usr/bin/arm-linux-gnueabihf-as ]] || install_deb binutils-arm-linux-gnueabihf
-    # [[ -f usr/bin/mips-linux-gnu-as ]]      || install_deb binutils-mips-linux-gnu
-    # [[ -f usr/bin/powerpc-linux-gnu-as ]]   || install_deb binutils-powerpc-linux-gnu
+    # Install cross-binutils which are not available
+    which x86_64-linux-gnu-ar || install_deb binutils-multiarch
+    which mips-linux-gnu-as || install_deb binutils-mips-linux-gnu
 
     # Test that the installs worked
     as                      --version
