@@ -26,17 +26,17 @@ setup_travis()
     export LD_LIBRARY_PATH=$PWD/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
     # Install a more modern binutils, which is required for some of the tests
-    [[ -f usr/bin/objcopy ]] || install_deb binutils
+    # [[ -f usr/bin/objcopy ]] || install_deb binutils
 
     # Install/upgrade qemu
-    [[ -f usr/bin/qemu-arm-static ]] || install_deb qemu-user-static xenial
+    # [[ -f usr/bin/qemu-arm-static ]] || install_deb qemu-user-static xenial
 
-    # Install cross-binutils
-    [[ -f usr/bin/x86_64-linux-gnu-ar ]]    || install_deb binutils-multiarch
-    [[ -f usr/bin/aarch64-linux-gnu-as ]]   || install_deb binutils-aarch64-linux-gnu
-    [[ -f usr/bin/arm-linux-gnueabihf-as ]] || install_deb binutils-arm-linux-gnueabihf
-    [[ -f usr/bin/mips-linux-gnu-as ]]      || install_deb binutils-mips-linux-gnu
-    [[ -f usr/bin/powerpc-linux-gnu-as ]]   || install_deb binutils-powerpc-linux-gnu
+    # # Install cross-binutils
+    # [[ -f usr/bin/x86_64-linux-gnu-ar ]]    || install_deb binutils-multiarch
+    # [[ -f usr/bin/aarch64-linux-gnu-as ]]   || install_deb binutils-aarch64-linux-gnu
+    # [[ -f usr/bin/arm-linux-gnueabihf-as ]] || install_deb binutils-arm-linux-gnueabihf
+    # [[ -f usr/bin/mips-linux-gnu-as ]]      || install_deb binutils-mips-linux-gnu
+    # [[ -f usr/bin/powerpc-linux-gnu-as ]]   || install_deb binutils-powerpc-linux-gnu
 
     # Test that the installs worked
     as                      --version

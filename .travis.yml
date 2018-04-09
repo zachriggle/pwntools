@@ -14,6 +14,14 @@ addons:
     - zsh
     - pandoc
     - gdb
+    - binutils
+    - binutils-aarch64-linux-gnu
+    - binutils-arm-linux-gnueabihf
+    - binutils-mips-linux-gnu
+    - binutils-multiarch-linux-gnu
+    - binutils-powerpc-linux-gnu
+    - qemu-user-static
+    - qemu-user-binfmt
 cache:
     - pip
     - directories:
