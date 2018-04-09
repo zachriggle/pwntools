@@ -11,7 +11,7 @@ local_deb_extract()
 
 install_deb()
 {
-    version=${2:-artful}
+    version=${2:-bionic}
     package=$1
     echo "Installing $package"
     INDEX="http://packages.ubuntu.com/en/$version/amd64/$package/download"
@@ -26,10 +26,10 @@ setup_travis()
     export LD_LIBRARY_PATH=$PWD/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
     # Install a more modern binutils, which is required for some of the tests
-    # [[ -f usr/bin/objcopy ]] || install_deb binutils
+    [[ -f usr/bin/objcopy ]] || install_deb binutils
 
     # Install/upgrade qemu
-    # [[ -f usr/bin/qemu-arm-static ]] || install_deb qemu-user-static xenial
+    [[ -f usr/bin/qemu-arm-static ]] || install_deb qemu-user-static
 
     # # Install cross-binutils
     # [[ -f usr/bin/x86_64-linux-gnu-ar ]]    || install_deb binutils-multiarch
