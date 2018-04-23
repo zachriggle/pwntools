@@ -1243,6 +1243,23 @@ def compile(source):
 
     return output[0]
 
+@with_device
+def compile_and_run_interactively_with_dmesg(source):
+    root()
+    wait_for_device()
+    # dmesg = process(['dmesg', '-w'])
+    # dmesg.clean()
+
+    write('/data/local/tmp/file0', '')
+    misc.write('poc.c', source)
+    exe = compile('poc.c')
+    push(exe, '/data/local/tmp/poc')
+
+    while True:
+        log.info(process(['sh', '-c', 'cd /data/local/tmp; strace -yy -f ./poc']).recvall())
+
+    # log.info(dmesg.clean())
+
 class Partition(object):
     def __init__(self, path, name, blocks=0):
         self.path = path

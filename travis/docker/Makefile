@@ -1,25 +1,30 @@
-ROOT = $(shell git rev-parse --show-toplevel)
 ANDROID ?= yes
 TARGET ?= ""
-TREE = $(shell cd $(ROOT) && git stash create "travis/docker testing")
-ARCHIVE = $(ROOT)/travis/docker/pwntools.tar.gz
 
-ifeq ($(strip $(TREE)),)
-TREE = HEAD
+ifeq ($(ANDROID),yes)
+TAG=travis-android
+else
+TAG=travis
 endif
 
-all: image
-	docker run -e "ANDROID=$(ANDROID)" -e "TARGET=$(TARGET)" --rm --init --privileged -it travis
+TAGS=travis travis-android
+
+image: $(TAG)
+
+all: $(TAG)
+	docker run -e "ANDROID=$(ANDROID)" -e "TARGET=$(TARGET)" --rm --init --privileged -it "pwntools/pwntools:$(TAG)"
 
 shell: image
-	docker run --rm --init --privileged --entrypoint /bin/bash -it travis
+	docker run --rm --init --privileged --entrypoint /bin/bash -it pwntools/pwntools:$(TAG)
 
-image: $(ARCHIVE)
-	docker build -t travis .
+$(TAGS): travis/$(ARCHIVE)
+	make -C "$@"
+	cp run.sh "$@"
+	docker build -t pwntools/pwntools:$@ $@
 
-$(ARCHIVE): FORCE
-	rm -f $@
-	cd $(ROOT) && git archive $(TREE) -o $@
+travis-android: travis
+
+clean:
 
 FORCE:
-.PHONY: all image
+.PHONY: all image $(TAGS)
